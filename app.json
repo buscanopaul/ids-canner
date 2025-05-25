@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "IdScanner",
-    "slug": "IdScanner",
+    "name": "Edge Scanner",
+    "slug": "edge-scanner",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "scheme": "edge-scanner",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -21,8 +22,8 @@
         "backgroundColor": "#ffffff"
       }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "plugins": [
+      "expo-router"
+    ]
   }
 }
