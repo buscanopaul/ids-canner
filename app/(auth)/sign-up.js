@@ -11,11 +11,17 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { useSignUp } from '@clerk/clerk-expo';
+import { useSignUp, useOAuth } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 
 export default function SignUpScreen() {
   const { signUp, setActive, isLoaded } = useSignUp();
+  const { startOAuthFlow: startGoogleOAuth } = useOAuth({
+    strategy: 'oauth_google',
+  });
+  const { startOAuthFlow: startAppleOAuth } = useOAuth({
+    strategy: 'oauth_apple',
+  });
   const router = useRouter();
 
   const [firstName, setFirstName] = useState('');
@@ -24,6 +30,10 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+
+  const isAnyLoading = loading || googleLoading || appleLoading;
 
   const handleSignUp = async () => {
     if (!isLoaded) return;
@@ -96,6 +106,40 @@ export default function SignUpScreen() {
     }
   };
 
+  const handleGoogleSignUp = async () => {
+    setGoogleLoading(true);
+    try {
+      const { createdSessionId, setActive } = await startGoogleOAuth();
+
+      if (createdSessionId) {
+        await setActive({ session: createdSessionId });
+        router.replace('/(tabs)');
+      }
+    } catch (err) {
+      console.error('Google sign up error:', err);
+      Alert.alert('Error', 'Failed to sign up with Google');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleAppleSignUp = async () => {
+    setAppleLoading(true);
+    try {
+      const { createdSessionId, setActive } = await startAppleOAuth();
+
+      if (createdSessionId) {
+        await setActive({ session: createdSessionId });
+        router.replace('/(tabs)');
+      }
+    } catch (err) {
+      console.error('Apple sign up error:', err);
+      Alert.alert('Error', 'Failed to sign up with Apple');
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
   const isValidEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -113,6 +157,59 @@ export default function SignUpScreen() {
             Fill in your details to get started
           </Text>
 
+          {/* Social Sign Up Options */}
+          <View style={styles.socialContainer}>
+            <TouchableOpacity
+              style={[
+                styles.socialButton,
+                styles.googleButton,
+                googleLoading && styles.buttonDisabled,
+              ]}
+              onPress={handleGoogleSignUp}
+              disabled={isAnyLoading}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.socialIcon}>🔍</Text>
+                  <Text style={styles.socialButtonText}>
+                    Sign up with Google
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[
+                  styles.socialButton,
+                  styles.appleButton,
+                  appleLoading && styles.buttonDisabled,
+                ]}
+                onPress={handleAppleSignUp}
+                disabled={isAnyLoading}
+              >
+                {appleLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Text style={styles.socialIcon}>🍎</Text>
+                    <Text style={styles.socialButtonText}>
+                      Sign up with Apple
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
           <View style={styles.inputContainer}>
             <Text style={styles.label}>First Name</Text>
             <TextInput
@@ -123,7 +220,7 @@ export default function SignUpScreen() {
               autoCapitalize="words"
               autoComplete="given-name"
               textContentType="givenName"
-              editable={!loading}
+              editable={!isAnyLoading}
               placeholderTextColor="#9CA3AF"
             />
           </View>
@@ -138,7 +235,7 @@ export default function SignUpScreen() {
               autoCapitalize="words"
               autoComplete="family-name"
               textContentType="familyName"
-              editable={!loading}
+              editable={!isAnyLoading}
               placeholderTextColor="#9CA3AF"
             />
           </View>
@@ -154,7 +251,7 @@ export default function SignUpScreen() {
               autoCapitalize="none"
               autoComplete="email"
               textContentType="emailAddress"
-              editable={!loading}
+              editable={!isAnyLoading}
               placeholderTextColor="#9CA3AF"
             />
           </View>
@@ -170,7 +267,7 @@ export default function SignUpScreen() {
               autoCapitalize="none"
               autoComplete="new-password"
               textContentType="newPassword"
-              editable={!loading}
+              editable={!isAnyLoading}
               placeholderTextColor="#9CA3AF"
             />
             <Text style={styles.hint}>
@@ -189,7 +286,7 @@ export default function SignUpScreen() {
               autoCapitalize="none"
               autoComplete="new-password"
               textContentType="newPassword"
-              editable={!loading}
+              editable={!isAnyLoading}
               placeholderTextColor="#9CA3AF"
             />
           </View>
@@ -202,7 +299,7 @@ export default function SignUpScreen() {
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleSignUp}
-            disabled={loading}
+            disabled={isAnyLoading}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
@@ -247,8 +344,51 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 30,
     color: '#666',
+  },
+  socialContainer: {
+    marginBottom: 20,
+  },
+  socialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  googleButton: {
+    backgroundColor: '#4285F4',
+  },
+  appleButton: {
+    backgroundColor: '#000',
+  },
+  socialIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  socialButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: '#9CA3AF',
   },
   inputContainer: {
     marginBottom: 20,

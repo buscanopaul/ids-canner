@@ -10,16 +10,26 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
-import { useSignIn } from '@clerk/clerk-expo';
+import { useSignIn, useOAuth } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
+  const { startOAuthFlow: startGoogleOAuth } = useOAuth({
+    strategy: 'oauth_google',
+  });
+  const { startOAuthFlow: startAppleOAuth } = useOAuth({
+    strategy: 'oauth_apple',
+  });
   const router = useRouter();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+
+  const isAnyLoading = loading || googleLoading || appleLoading;
 
   const handleSignIn = async () => {
     if (!isLoaded) return;
@@ -55,6 +65,40 @@ export default function SignInScreen() {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      const { createdSessionId, setActive } = await startGoogleOAuth();
+
+      if (createdSessionId) {
+        await setActive({ session: createdSessionId });
+        router.replace('/(tabs)');
+      }
+    } catch (err) {
+      console.error('Google sign in error:', err);
+      Alert.alert('Error', 'Failed to sign in with Google');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setAppleLoading(true);
+    try {
+      const { createdSessionId, setActive } = await startAppleOAuth();
+
+      if (createdSessionId) {
+        await setActive({ session: createdSessionId });
+        router.replace('/(tabs)');
+      }
+    } catch (err) {
+      console.error('Apple sign in error:', err);
+      Alert.alert('Error', 'Failed to sign in with Apple');
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -74,7 +118,7 @@ export default function SignInScreen() {
             autoCapitalize="none"
             autoComplete="username"
             textContentType="username"
-            editable={!loading}
+            editable={!isAnyLoading}
             placeholderTextColor="#9CA3AF"
           />
         </View>
@@ -90,7 +134,7 @@ export default function SignInScreen() {
             autoCapitalize="none"
             autoComplete="password"
             textContentType="password"
-            editable={!loading}
+            editable={!isAnyLoading}
             placeholderTextColor="#9CA3AF"
           />
         </View>
@@ -98,7 +142,7 @@ export default function SignInScreen() {
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleSignIn}
-          disabled={loading}
+          disabled={isAnyLoading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -106,6 +150,52 @@ export default function SignInScreen() {
             <Text style={styles.buttonText}>Sign In</Text>
           )}
         </TouchableOpacity>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.socialButton,
+            styles.googleButton,
+            googleLoading && styles.buttonDisabled,
+          ]}
+          onPress={handleGoogleSignIn}
+          disabled={isAnyLoading}
+        >
+          {googleLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.socialIcon}>🔍</Text>
+              <Text style={styles.socialButtonText}>Continue with Google</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {Platform.OS === 'ios' && (
+          <TouchableOpacity
+            style={[
+              styles.socialButton,
+              styles.appleButton,
+              appleLoading && styles.buttonDisabled,
+            ]}
+            onPress={handleAppleSignIn}
+            disabled={isAnyLoading}
+          >
+            {appleLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.socialIcon}>🍎</Text>
+                <Text style={styles.socialButtonText}>Continue with Apple</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account? </Text>
@@ -169,6 +259,46 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  socialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  googleButton: {
+    backgroundColor: '#4285F4',
+  },
+  appleButton: {
+    backgroundColor: '#000',
+  },
+  socialIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  socialButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
