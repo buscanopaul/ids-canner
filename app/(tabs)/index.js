@@ -9,6 +9,8 @@ import {
   StatusBar,
   Animated,
   Image,
+  Platform,
+  Linking,
 } from 'react-native';
 import { CameraView, Camera } from 'expo-camera';
 import { useUser } from '@clerk/clerk-expo';
@@ -94,6 +96,32 @@ export default function ScannerScreen() {
     Alert.alert('Profile', 'Profile feature coming soon!');
   };
 
+  const handleLogoPress = () => {
+    const appId = 'your-app-id'; // Replace with your actual app ID
+    let storeUrl;
+
+    if (Platform.OS === 'ios') {
+      // iOS App Store URL for reviews
+      storeUrl = `https://apps.apple.com/app/id${appId}?action=write-review`;
+    } else {
+      // Google Play Store URL for reviews
+      storeUrl = `https://play.google.com/store/apps/details?id=com.yourcompany.edgescanner&showAllReviews=true`;
+    }
+
+    Linking.canOpenURL(storeUrl)
+      .then((supported) => {
+        if (supported) {
+          Linking.openURL(storeUrl);
+        } else {
+          Alert.alert('Error', 'Unable to open app store');
+        }
+      })
+      .catch((err) => {
+        console.error('Error opening app store:', err);
+        Alert.alert('Error', 'Unable to open app store');
+      });
+  };
+
   if (hasPermission === null) {
     return (
       <View style={styles.container}>
@@ -142,7 +170,7 @@ export default function ScannerScreen() {
       >
         {/* Top Controls - Logo left, Flash right */}
         <View style={styles.topControls}>
-          <TouchableOpacity style={styles.logoButton}>
+          <TouchableOpacity style={styles.logoButton} onPress={handleLogoPress}>
             <Image
               source={require('../../assets/logo_edgescanner.png')}
               style={styles.logoImage}
