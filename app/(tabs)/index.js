@@ -1,152 +1,453 @@
-import React from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
+  StyleSheet,
+  Dimensions,
   Alert,
+  StatusBar,
+  Animated,
+  Image,
 } from 'react-native';
-import { useUser, useAuth } from '@clerk/clerk-expo';
+import { CameraView, Camera } from 'expo-camera';
+import { useUser } from '@clerk/clerk-expo';
+import { Entypo, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import LoadingDots from '../components/LoadingDots';
 
-export default function HomeScreen() {
+const { width, height } = Dimensions.get('window');
+
+export default function ScannerScreen() {
   const { user } = useUser();
-  const { signOut } = useAuth();
+  const [hasPermission, setHasPermission] = useState(null);
+  const [scanned, setScanned] = useState(false);
+  const [flashMode, setFlashMode] = useState('off');
+  const [isScanning, setIsScanning] = useState(false);
+  const [selectedOption, setSelectedOption] = useState(1); // 0=manual, 1=scanner, 2=profile
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: () => signOut(),
-        },
-      ]
+  useEffect(() => {
+    const getCameraPermissions = async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+    };
+
+    getCameraPermissions();
+  }, []);
+
+  useEffect(() => {
+    // Pulse animation for scan frame
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.8,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const handleBarCodeScanned = ({ type, data }) => {
+    if (scanned) return;
+
+    setScanned(true);
+    setIsScanning(true);
+
+    // Simulate nutrition checking delay
+    setTimeout(() => {
+      setIsScanning(false);
+      Alert.alert(
+        'Scanned Successfully',
+        `Bar code with type ${type} and data ${data} has been scanned!`,
+        [
+          {
+            text: 'Scan Another',
+            onPress: () => setScanned(false),
+          },
+        ]
+      );
+    }, 2000);
+  };
+
+  const toggleFlash = () => {
+    setFlashMode(flashMode === 'off' ? 'on' : 'off');
+  };
+
+  const handleManualInput = () => {
+    setSelectedOption(0);
+    Alert.alert('Manual Input', 'Manual ID input feature coming soon!');
+  };
+
+  const handleScannerSelect = () => {
+    setSelectedOption(1);
+    setScanned(false);
+  };
+
+  const handleProfileSelect = () => {
+    setSelectedOption(2);
+    Alert.alert('Profile', 'Profile feature coming soon!');
+  };
+
+  if (hasPermission === null) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.permissionText}>
+          Requesting camera permission...
+        </Text>
+      </View>
     );
-  };
+  }
 
-  const formatPhoneNumber = (phone) => {
-    if (!phone) return 'No phone number';
-    // Format +1234567890 to +1 (234) 567-890
-    const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
-    }
-    return phone;
-  };
+  if (hasPermission === false) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.permissionText}>No access to camera</Text>
+        <TouchableOpacity
+          style={styles.permissionButton}
+          onPress={() => Camera.requestCameraPermissionsAsync()}
+        >
+          <Text style={styles.permissionButtonText}>Grant Permission</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView className="flex-1 bg-gray-50">
-      <View className="px-5 pt-16 pb-8">
-        {/* Header */}
-        <View className="mb-8">
-          <Text className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome to Edge Scanner
-          </Text>
-          <Text className="text-base text-gray-600">
-            You're successfully authenticated!
-          </Text>
-        </View>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
 
-        {/* User Info Card */}
-        <View className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
-          <Text className="text-xl font-semibold text-gray-900 mb-4">
-            Your Account
-          </Text>
-          
-          <View className="space-y-3">
-            <View className="flex-row justify-between items-center py-2">
-              <Text className="text-gray-600 font-medium">User ID</Text>
-              <Text className="text-gray-900 font-mono text-sm">
-                {user?.id?.slice(0, 8)}...
-              </Text>
-            </View>
-            
-            <View className="flex-row justify-between items-center py-2">
-              <Text className="text-gray-600 font-medium">Phone Number</Text>
-              <Text className="text-gray-900">
-                {formatPhoneNumber(user?.primaryPhoneNumber?.phoneNumber)}
-              </Text>
-            </View>
-            
-            <View className="flex-row justify-between items-center py-2">
-              <Text className="text-gray-600 font-medium">Created</Text>
-              <Text className="text-gray-900">
-                {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
-              </Text>
-            </View>
-            
-            <View className="flex-row justify-between items-center py-2">
-              <Text className="text-gray-600 font-medium">Last Sign In</Text>
-              <Text className="text-gray-900">
-                {user?.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString() : 'Unknown'}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Features Card */}
-        <View className="bg-white rounded-2xl p-6 mb-6 shadow-sm">
-          <Text className="text-xl font-semibold text-gray-900 mb-4">
-            App Features
-          </Text>
-          
-          <View className="space-y-3">
-            <TouchableOpacity className="flex-row items-center py-3 px-4 bg-blue-50 rounded-xl">
-              <View className="w-10 h-10 bg-blue-500 rounded-full items-center justify-center mr-3">
-                <Text className="text-white font-bold">📱</Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-gray-900 font-semibold">SMS Authentication</Text>
-                <Text className="text-gray-600 text-sm">Secure phone-based login</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity className="flex-row items-center py-3 px-4 bg-green-50 rounded-xl">
-              <View className="w-10 h-10 bg-green-500 rounded-full items-center justify-center mr-3">
-                <Text className="text-white font-bold">🔒</Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-gray-900 font-semibold">Secure Sessions</Text>
-                <Text className="text-gray-600 text-sm">Protected user sessions</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <TouchableOpacity className="flex-row items-center py-3 px-4 bg-purple-50 rounded-xl">
-              <View className="w-10 h-10 bg-purple-500 rounded-full items-center justify-center mr-3">
-                <Text className="text-white font-bold">⚡</Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-gray-900 font-semibold">Fast Verification</Text>
-                <Text className="text-gray-600 text-sm">Quick 6-digit code verification</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Actions */}
-        <View className="space-y-3">
-          <TouchableOpacity className="bg-blue-500 rounded-xl p-4 items-center">
-            <Text className="text-white text-base font-semibold">
-              Refresh User Data
-            </Text>
+      <CameraView
+        style={styles.camera}
+        facing="back"
+        flash={flashMode}
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barcodeScannerSettings={{
+          barcodeTypes: [
+            'qr',
+            'ean13',
+            'ean8',
+            'code128',
+            'code39',
+            'upc_a',
+            'upc_e',
+            'codabar',
+          ],
+        }}
+      >
+        {/* Top Controls - Logo left, Flash right */}
+        <View style={styles.topControls}>
+          <TouchableOpacity style={styles.logoButton}>
+            <Image
+              source={require('../../assets/logo_edgescanner.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            className="bg-red-500 rounded-xl p-4 items-center"
-            onPress={handleSignOut}
+
+          <TouchableOpacity
+            style={[
+              styles.flashButton,
+              flashMode === 'on' && styles.flashButtonActive,
+            ]}
+            onPress={toggleFlash}
           >
-            <Text className="text-white text-base font-semibold">
-              Sign Out
-            </Text>
+            <Ionicons
+              name={flashMode === 'on' ? 'flash' : 'flash-off'}
+              size={18}
+              color="black"
+            />
           </TouchableOpacity>
         </View>
-      </View>
-    </ScrollView>
+
+        {/* Scanning Frame */}
+        <View style={styles.scanningArea}>
+          <Animated.View style={[styles.scanFrame, { opacity: pulseAnim }]}>
+            {/* Corner borders */}
+            <View style={[styles.corner, styles.topLeft]} />
+            <View style={[styles.corner, styles.topRight]} />
+            <View style={[styles.corner, styles.bottomLeft]} />
+            <View style={[styles.corner, styles.bottomRight]} />
+          </Animated.View>
+        </View>
+
+        {/* Status Text */}
+        {isScanning && (
+          <View style={styles.statusContainer}>
+            <View style={styles.statusBubble}>
+              <Text style={styles.statusText}>
+                Checking nutrition details...
+              </Text>
+              <LoadingDots />
+            </View>
+          </View>
+        )}
+
+        {/* Bottom Controls - 3 Options */}
+        <View style={styles.bottomControls}>
+          <View style={styles.bottomOptionsContainer}>
+            {/* Manual Input */}
+            <TouchableOpacity
+              style={[
+                styles.optionButton,
+                selectedOption === 0 && styles.selectedOption,
+              ]}
+              onPress={handleManualInput}
+            >
+              <Entypo
+                name="keyboard"
+                size={24}
+                color={selectedOption === 0 ? 'white' : 'white'}
+              />
+            </TouchableOpacity>
+
+            {/* Scanner */}
+            <TouchableOpacity
+              style={[styles.optionButton]}
+              onPress={handleScannerSelect}
+            >
+              <Ionicons name="scan" size={28} color="white" />
+            </TouchableOpacity>
+            <View
+              style={{
+                position: 'absolute',
+                width: 90,
+                height: 90,
+                backgroundColor: '#4F46E5',
+                borderRadius: 90,
+                left: '50%',
+                marginLeft: -85,
+                top: '50%',
+                marginTop: -40,
+                zIndex: -1,
+                shadowColor: '#4F46E5',
+                shadowOffset: {
+                  width: 0,
+                  height: 4,
+                },
+                shadowOpacity: 0.4,
+                shadowRadius: 8,
+                elevation: 12,
+              }}
+            />
+
+            {/* Profile */}
+            <TouchableOpacity
+              style={[
+                styles.optionButton,
+                selectedOption === 2 && styles.selectedOption,
+              ]}
+              onPress={handleProfileSelect}
+            >
+              <MaterialIcons
+                name="broadcast-on-personal"
+                size={24}
+                color={selectedOption === 2 ? 'white' : 'white'}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </CameraView>
+    </View>
   );
-} 
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
+  camera: {
+    flex: 1,
+  },
+  topControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+  },
+  logoButton: {
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  flashButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 25,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  flashButtonActive: {
+    backgroundColor: '#FFD700',
+  },
+  profileButton: {
+    width: 50,
+    height: 50,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  profilePicture: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  profileText: {
+    color: '#4F46E5',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  scanningArea: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: width * 0.8,
+    height: width * 0.8,
+    position: 'relative',
+  },
+  corner: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderColor: 'white',
+  },
+  topLeft: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderTopLeftRadius: 10,
+  },
+  topRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderTopRightRadius: 10,
+  },
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderBottomLeftRadius: 10,
+  },
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderBottomRightRadius: 10,
+  },
+  statusContainer: {
+    position: 'absolute',
+    bottom: 200,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  statusBubble: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusText: {
+    fontSize: 16,
+    color: '#333',
+    marginRight: 10,
+  },
+  bottomControls: {
+    position: 'absolute',
+    bottom: 50,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  bottomOptionsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#191a20',
+    borderRadius: 90,
+    paddingHorizontal: 20,
+    paddingVertical: 5,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+    gap: 20,
+  },
+  optionButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 10,
+  },
+  permissionText: {
+    textAlign: 'center',
+    fontSize: 18,
+    color: 'white',
+    marginBottom: 20,
+  },
+  permissionButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  permissionButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});
