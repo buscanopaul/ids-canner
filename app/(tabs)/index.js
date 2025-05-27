@@ -249,7 +249,7 @@ export default function ScannerScreen() {
                 backgroundColor: '#4F46E5',
                 borderRadius: 90,
                 left: '50%',
-                marginLeft: -85,
+                marginLeft: Platform.OS === 'ios' ? -85 : -45,
                 top: '50%',
                 marginTop: -40,
                 zIndex: -1,
