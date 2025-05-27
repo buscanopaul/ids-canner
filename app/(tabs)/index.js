@@ -11,6 +11,11 @@ import {
   Image,
   Platform,
   Linking,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  ScrollView,
 } from 'react-native';
 import { CameraView, Camera } from 'expo-camera';
 import { useUser } from '@clerk/clerk-expo';
@@ -26,7 +31,29 @@ export default function ScannerScreen() {
   const [flashMode, setFlashMode] = useState('off');
   const [isScanning, setIsScanning] = useState(false);
   const [selectedOption, setSelectedOption] = useState(1); // 0=manual, 1=scanner, 2=profile
+  const [showBottomSheet, setShowBottomSheet] = useState(false);
+  const [manualInput, setManualInput] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isScannerActive, setIsScannerActive] = useState(false);
+  const [selectedIdType, setSelectedIdType] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(300)).current;
+  const scanLineAnim = useRef(new Animated.Value(0)).current;
+
+  const idTypes = [
+    'Driver\'s License',
+    'Senior Citizen',
+    'PWD ID',
+    'Passport',
+    'National ID',
+    'SSS ID',
+    'GSIS ID',
+    'PRC ID',
+    'OWWA ID',
+    'NBI Clearance',
+    'PSA Birth Certificate',
+  ];
 
   useEffect(() => {
     const getCameraPermissions = async () => {
@@ -55,11 +82,52 @@ export default function ScannerScreen() {
     ).start();
   }, []);
 
+  useEffect(() => {
+    if (showBottomSheet) {
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 8,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: 300,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showBottomSheet]);
+
+  useEffect(() => {
+    if (isScannerActive) {
+      // Start scan line animation
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(scanLineAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scanLineAnim, {
+            toValue: 0,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      // Reset scan line animation
+      scanLineAnim.setValue(0);
+    }
+  }, [isScannerActive]);
+
   const handleBarCodeScanned = ({ type, data }) => {
     if (scanned) return;
 
     setScanned(true);
     setIsScanning(true);
+    setIsScannerActive(false);
 
     // Simulate nutrition checking delay
     setTimeout(() => {
@@ -70,7 +138,10 @@ export default function ScannerScreen() {
         [
           {
             text: 'Scan Another',
-            onPress: () => setScanned(false),
+            onPress: () => {
+              setScanned(false);
+              setIsScannerActive(true);
+            },
           },
         ]
       );
@@ -83,16 +154,63 @@ export default function ScannerScreen() {
 
   const handleManualInput = () => {
     setSelectedOption(0);
-    Alert.alert('Manual Input', 'Manual ID input feature coming soon!');
+    setIsScannerActive(false);
+    setShowBottomSheet(true);
+    setManualInput('');
+    setSelectedIdType('');
+    setShowDropdown(false);
+  };
+
+  const closeBottomSheet = () => {
+    setShowBottomSheet(false);
+    setManualInput('');
+    setSelectedIdType('');
+    setShowDropdown(false);
+    setIsVerifying(false);
+  };
+
+  const handleDropdownSelect = (idType) => {
+    setSelectedIdType(idType);
+    setShowDropdown(false);
+  };
+
+  const handleVerifyInput = () => {
+    if (!selectedIdType) {
+      Alert.alert('Error', 'Please select an ID type');
+      return;
+    }
+    if (!manualInput.trim()) {
+      Alert.alert('Error', 'Please enter an ID number');
+      return;
+    }
+
+    setIsVerifying(true);
+
+    // Simulate verification process
+    setTimeout(() => {
+      setIsVerifying(false);
+      Alert.alert(
+        'Verification Complete',
+        `${selectedIdType} with ID "${manualInput}" has been verified!`,
+        [
+          {
+            text: 'OK',
+            onPress: closeBottomSheet,
+          },
+        ]
+      );
+    }, 2000);
   };
 
   const handleScannerSelect = () => {
     setSelectedOption(1);
     setScanned(false);
+    setIsScannerActive(true);
   };
 
   const handleProfileSelect = () => {
     setSelectedOption(2);
+    setIsScannerActive(false);
     Alert.alert('Profile', 'Profile feature coming soon!');
   };
 
@@ -201,7 +319,47 @@ export default function ScannerScreen() {
             <View style={[styles.corner, styles.topRight]} />
             <View style={[styles.corner, styles.bottomLeft]} />
             <View style={[styles.corner, styles.bottomRight]} />
+            
+            {/* Animated Scan Line */}
+            {isScannerActive && (
+              <Animated.View
+                style={[
+                  styles.scanLine,
+                  {
+                    transform: [
+                      {
+                        translateY: scanLineAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, width * 0.8 - 4], // Scan from top to bottom of frame
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              />
+            )}
           </Animated.View>
+          
+          {/* Instruction Text */}
+          {!scanned && !isScanning && !isScannerActive && (
+            <View style={styles.instructionContainer}>
+              <Text style={styles.instructionText}>
+                Tap the scanner button below to start scanning
+              </Text>
+            </View>
+          )}
+          
+          {/* Active Scanning Instructions */}
+          {isScannerActive && !scanned && !isScanning && (
+            <View style={styles.activeScanContainer}>
+              <Text style={styles.activeScanText}>
+                🔍 Scanning Active
+              </Text>
+              <Text style={styles.activeScanSubtext}>
+                Point your camera at a barcode or QR code
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Status Text */}
@@ -281,6 +439,118 @@ export default function ScannerScreen() {
           </View>
         </View>
       </CameraView>
+
+      {/* Bottom Sheet Modal */}
+      <Modal
+        visible={showBottomSheet}
+        transparent={true}
+        animationType="none"
+        onRequestClose={closeBottomSheet}
+      >
+        <TouchableWithoutFeedback onPress={closeBottomSheet}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.keyboardAvoidingView}
+              >
+                <Animated.View
+                  style={[
+                    styles.bottomSheet,
+                    { transform: [{ translateY: slideAnim }] },
+                  ]}
+                >
+                  {/* Handle Bar */}
+                  <View style={styles.handleBar} />
+                  
+                  {/* Content */}
+                  <View style={styles.bottomSheetContent}>
+                    <Text style={styles.bottomSheetTitle}>
+                      Enter ID Information
+                    </Text>
+                    <Text style={styles.bottomSheetSubtitle}>
+                      Select ID type and enter ID number for verification
+                    </Text>
+                    
+                    {/* ID Type Dropdown */}
+                    <TouchableOpacity
+                      style={[
+                        styles.dropdownButton,
+                        isVerifying && styles.dropdownButtonDisabled
+                      ]}
+                      onPress={() => !isVerifying && setShowDropdown(!showDropdown)}
+                      disabled={isVerifying}
+                    >
+                      <Text style={[
+                        styles.dropdownButtonText,
+                        !selectedIdType && styles.dropdownPlaceholder,
+                        isVerifying && styles.dropdownTextDisabled
+                      ]}>
+                        {selectedIdType || 'Select ID Type'}
+                      </Text>
+                      <Ionicons 
+                        name={showDropdown ? 'chevron-up' : 'chevron-down'} 
+                        size={20} 
+                        color={isVerifying ? "#CCC" : "#666"} 
+                      />
+                    </TouchableOpacity>
+                    
+                    {/* Dropdown List */}
+                    {showDropdown && !isVerifying && (
+                      <ScrollView style={styles.dropdownList}>
+                        {idTypes.map((idType, index) => (
+                          <TouchableOpacity
+                            key={index}
+                            style={[
+                              styles.dropdownItem,
+                              index === idTypes.length - 1 && styles.dropdownItemLast
+                            ]}
+                            onPress={() => handleDropdownSelect(idType)}
+                          >
+                            <Text style={styles.dropdownItemText}>{idType}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    )}
+                    
+                    <TextInput
+                      style={[
+                        styles.textInput,
+                        isVerifying && styles.textInputDisabled
+                      ]}
+                      placeholder="Enter ID number"
+                      placeholderTextColor={isVerifying ? "#CCC" : "#999"}
+                      value={manualInput}
+                      onChangeText={setManualInput}
+                      returnKeyType="done"
+                      onSubmitEditing={handleVerifyInput}
+                      editable={!isVerifying}
+                    />
+                    
+                    <TouchableOpacity
+                      style={[
+                        styles.verifyButton,
+                        isVerifying && styles.verifyButtonDisabled,
+                      ]}
+                      onPress={handleVerifyInput}
+                      disabled={isVerifying}
+                    >
+                      {isVerifying ? (
+                        <View style={styles.verifyingContainer}>
+                          <Text style={styles.verifyButtonText}>Verifying...</Text>
+                          <LoadingDots />
+                        </View>
+                      ) : (
+                        <Text style={styles.verifyButtonText}>Verify</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </Animated.View>
+              </KeyboardAvoidingView>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }
@@ -477,5 +747,235 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  keyboardAvoidingView: {
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 10,
+    minHeight: 480,
+    maxHeight: height * 0.8,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  bottomSheetContent: {
+    alignItems: 'center',
+  },
+  bottomSheetTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  bottomSheetSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  textInput: {
+    width: '100%',
+    height: 50,
+    borderColor: '#D1D5DB',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    backgroundColor: '#F9FAFB',
+    marginBottom: 20,
+  },
+  verifyButton: {
+    backgroundColor: '#4F46E5',
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+    shadowColor: '#4F46E5',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  verifyButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  verifyingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  instructionContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  instructionText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    textShadowRadius: 3,
+  },
+  instructionSubtext: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    textShadowRadius: 3,
+  },
+  scanLine: {
+    position: 'absolute',
+    width: '100%',
+    height: 2,
+    backgroundColor: '#4F46E5',
+    left: 0,
+    top: 0,
+    shadowColor: '#4F46E5',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  activeScanContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  activeScanText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.5)',
+    textAlign: 'center',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    textShadowRadius: 3,
+  },
+  activeScanSubtext: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    textShadowRadius: 3,
+  },
+  dropdownButton: {
+    width: '100%',
+    height: 50,
+    borderColor: '#D1D5DB',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#F9FAFB',
+    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownButtonText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  dropdownPlaceholder: {
+    color: '#999',
+  },
+  dropdownList: {
+    width: '100%',
+    maxHeight: 200,
+    backgroundColor: 'white',
+    borderColor: '#D1D5DB',
+    borderWidth: 1,
+    borderRadius: 8,
+    marginTop: -20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  dropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  dropdownItemLast: {
+    borderBottomWidth: 0,
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  dropdownButtonDisabled: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+    opacity: 0.6,
+  },
+  dropdownTextDisabled: {
+    color: '#9CA3AF',
+  },
+  textInputDisabled: {
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+    opacity: 0.6,
   },
 });
