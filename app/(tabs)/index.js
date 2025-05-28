@@ -173,6 +173,7 @@ export default function ScannerScreen() {
   const handleManualInput = () => {
     setSelectedOption(0);
     setIsScannerActive(false);
+    setFlashMode('off');
     setShowBottomSheet(true);
     setManualInput('');
     setSelectedIdType('');
@@ -229,6 +230,7 @@ export default function ScannerScreen() {
   const handleProfileSelect = () => {
     setSelectedOption(2);
     setIsScannerActive(false);
+    setFlashMode('off');
     
     // Animate button press
     Animated.sequence([
