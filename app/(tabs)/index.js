@@ -20,12 +20,14 @@ import {
 import { CameraView, Camera } from 'expo-camera';
 import { useUser } from '@clerk/clerk-expo';
 import { Entypo, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import LoadingDots from '../components/LoadingDots';
 
 const { width, height } = Dimensions.get('window');
 
 export default function ScannerScreen() {
   const { user } = useUser();
+  const router = useRouter();
   const [hasPermission, setHasPermission] = useState(null);
   const [scanned, setScanned] = useState(false);
   const [flashMode, setFlashMode] = useState('off');
@@ -37,6 +39,8 @@ export default function ScannerScreen() {
   const [isScannerActive, setIsScannerActive] = useState(false);
   const [selectedIdType, setSelectedIdType] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [profileButtonScale] = useState(new Animated.Value(1));
+  const [screenOpacity] = useState(new Animated.Value(1));
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(300)).current;
   const scanLineAnim = useRef(new Animated.Value(0)).current;
@@ -63,6 +67,20 @@ export default function ScannerScreen() {
 
     getCameraPermissions();
   }, []);
+
+  // Screen entrance animation when returning from profile
+  useEffect(() => {
+    const unsubscribe = router.canGoBack ? () => {
+      // Animate screen entrance when returning
+      Animated.timing(screenOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } : null;
+
+    return unsubscribe;
+  }, [router]);
 
   useEffect(() => {
     // Pulse animation for scan frame
@@ -211,7 +229,25 @@ export default function ScannerScreen() {
   const handleProfileSelect = () => {
     setSelectedOption(2);
     setIsScannerActive(false);
-    Alert.alert('Profile', 'Profile feature coming soon!');
+    
+    // Animate button press
+    Animated.sequence([
+      Animated.timing(profileButtonScale, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(profileButtonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    // Add a slight delay before navigation for smooth transition
+    setTimeout(() => {
+      router.push('/(tabs)/profile');
+    }, 200);
   };
 
   const handleLogoPress = () => {
@@ -268,177 +304,181 @@ export default function ScannerScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      <CameraView
-        style={styles.camera}
-        facing="back"
-        flash={flashMode}
-        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barcodeScannerSettings={{
-          barcodeTypes: [
-            'qr',
-            'ean13',
-            'ean8',
-            'code128',
-            'code39',
-            'upc_a',
-            'upc_e',
-            'codabar',
-          ],
-        }}
-      >
-        {/* Top Controls - Logo left, Flash right */}
-        <View style={styles.topControls}>
-          <TouchableOpacity style={styles.logoButton} onPress={handleLogoPress}>
-            <Image
-              source={require('../../assets/logo_edgescanner.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
+      <Animated.View style={[{ flex: 1 }, { opacity: screenOpacity }]}>
+        <CameraView
+          style={styles.camera}
+          facing="back"
+          flash={flashMode}
+          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+          barcodeScannerSettings={{
+            barcodeTypes: [
+              'qr',
+              'ean13',
+              'ean8',
+              'code128',
+              'code39',
+              'upc_a',
+              'upc_e',
+              'codabar',
+            ],
+          }}
+        >
+          {/* Top Controls - Logo left, Flash right */}
+          <View style={styles.topControls}>
+            <TouchableOpacity style={styles.logoButton} onPress={handleLogoPress}>
+              <Image
+                source={require('../../assets/logo_edgescanner.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.flashButton,
-              flashMode === 'on' && styles.flashButtonActive,
-            ]}
-            onPress={toggleFlash}
-          >
-            <Ionicons
-              name={flashMode === 'on' ? 'flash' : 'flash-off'}
-              size={18}
-              color="black"
-            />
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[
+                styles.flashButton,
+                flashMode === 'on' && styles.flashButtonActive,
+              ]}
+              onPress={toggleFlash}
+            >
+              <Ionicons
+                name={flashMode === 'on' ? 'flash' : 'flash-off'}
+                size={18}
+                color="black"
+              />
+            </TouchableOpacity>
+          </View>
 
-        {/* Scanning Frame */}
-        <View style={styles.scanningArea}>
-          <Animated.View style={[styles.scanFrame, { opacity: pulseAnim }]}>
-            {/* Corner borders */}
-            <View style={[styles.corner, styles.topLeft]} />
-            <View style={[styles.corner, styles.topRight]} />
-            <View style={[styles.corner, styles.bottomLeft]} />
-            <View style={[styles.corner, styles.bottomRight]} />
+          {/* Scanning Frame */}
+          <View style={styles.scanningArea}>
+            <Animated.View style={[styles.scanFrame, { opacity: pulseAnim }]}>
+              {/* Corner borders */}
+              <View style={[styles.corner, styles.topLeft]} />
+              <View style={[styles.corner, styles.topRight]} />
+              <View style={[styles.corner, styles.bottomLeft]} />
+              <View style={[styles.corner, styles.bottomRight]} />
+              
+              {/* Animated Scan Line */}
+              {isScannerActive && (
+                <Animated.View
+                  style={[
+                    styles.scanLine,
+                    {
+                      transform: [
+                        {
+                          translateY: scanLineAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, width * 0.8 - 4], // Scan from top to bottom of frame
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              )}
+            </Animated.View>
             
-            {/* Animated Scan Line */}
-            {isScannerActive && (
-              <Animated.View
-                style={[
-                  styles.scanLine,
-                  {
-                    transform: [
-                      {
-                        translateY: scanLineAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0, width * 0.8 - 4], // Scan from top to bottom of frame
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              />
+            {/* Instruction Text */}
+            {!scanned && !isScanning && !isScannerActive && (
+              <View style={styles.instructionContainer}>
+                <Text style={styles.instructionText}>
+                  Tap the scanner button below to start scanning
+                </Text>
+              </View>
             )}
-          </Animated.View>
-          
-          {/* Instruction Text */}
-          {!scanned && !isScanning && !isScannerActive && (
-            <View style={styles.instructionContainer}>
-              <Text style={styles.instructionText}>
-                Tap the scanner button below to start scanning
-              </Text>
+            
+            {/* Active Scanning Instructions */}
+            {isScannerActive && !scanned && !isScanning && (
+              <View style={styles.activeScanContainer}>
+                <Text style={styles.activeScanText}>
+                  🔍 Scanning Active
+                </Text>
+                <Text style={styles.activeScanSubtext}>
+                  Point your camera at a barcode or QR code
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Status Text */}
+          {isScanning && (
+            <View style={styles.statusContainer}>
+              <View style={styles.statusBubble}>
+                <Text style={styles.statusText}>
+                  Checking nutrition details...
+                </Text>
+                <LoadingDots />
+              </View>
             </View>
           )}
-          
-          {/* Active Scanning Instructions */}
-          {isScannerActive && !scanned && !isScanning && (
-            <View style={styles.activeScanContainer}>
-              <Text style={styles.activeScanText}>
-                🔍 Scanning Active
-              </Text>
-              <Text style={styles.activeScanSubtext}>
-                Point your camera at a barcode or QR code
-              </Text>
-            </View>
-          )}
-        </View>
 
-        {/* Status Text */}
-        {isScanning && (
-          <View style={styles.statusContainer}>
-            <View style={styles.statusBubble}>
-              <Text style={styles.statusText}>
-                Checking nutrition details...
-              </Text>
-              <LoadingDots />
+          {/* Bottom Controls - 3 Options */}
+          <View style={styles.bottomControls}>
+            <View style={styles.bottomOptionsContainer}>
+              {/* Manual Input */}
+              <TouchableOpacity
+                style={[
+                  styles.optionButton,
+                  selectedOption === 0 && styles.selectedOption,
+                ]}
+                onPress={handleManualInput}
+              >
+                <Entypo
+                  name="keyboard"
+                  size={24}
+                  color={selectedOption === 0 ? 'white' : 'white'}
+                />
+              </TouchableOpacity>
+
+              {/* Scanner */}
+              <TouchableOpacity
+                style={[styles.optionButton]}
+                onPress={handleScannerSelect}
+              >
+                <Ionicons name="scan" size={28} color="white" />
+              </TouchableOpacity>
+              <View
+                style={{
+                  position: 'absolute',
+                  width: 90,
+                  height: 90,
+                  backgroundColor: '#4F46E5',
+                  borderRadius: 90,
+                  left: '50%',
+                  marginLeft: Platform.OS === 'ios' ? -85 : -45,
+                  top: '50%',
+                  marginTop: -40,
+                  zIndex: -1,
+                  shadowColor: '#4F46E5',
+                  shadowOffset: {
+                    width: 0,
+                    height: 4,
+                  },
+                  shadowOpacity: 0.4,
+                  shadowRadius: 8,
+                  elevation: 12,
+                }}
+              />
+
+              {/* Profile */}
+              <Animated.View style={{ transform: [{ scale: profileButtonScale }] }}>
+                <TouchableOpacity
+                  style={[
+                    styles.optionButton,
+                    selectedOption === 2 && styles.selectedOption,
+                  ]}
+                  onPress={handleProfileSelect}
+                >
+                  <MaterialIcons
+                    name="broadcast-on-personal"
+                    size={24}
+                    color={selectedOption === 2 ? 'white' : 'white'}
+                  />
+                </TouchableOpacity>
+              </Animated.View>
             </View>
           </View>
-        )}
-
-        {/* Bottom Controls - 3 Options */}
-        <View style={styles.bottomControls}>
-          <View style={styles.bottomOptionsContainer}>
-            {/* Manual Input */}
-            <TouchableOpacity
-              style={[
-                styles.optionButton,
-                selectedOption === 0 && styles.selectedOption,
-              ]}
-              onPress={handleManualInput}
-            >
-              <Entypo
-                name="keyboard"
-                size={24}
-                color={selectedOption === 0 ? 'white' : 'white'}
-              />
-            </TouchableOpacity>
-
-            {/* Scanner */}
-            <TouchableOpacity
-              style={[styles.optionButton]}
-              onPress={handleScannerSelect}
-            >
-              <Ionicons name="scan" size={28} color="white" />
-            </TouchableOpacity>
-            <View
-              style={{
-                position: 'absolute',
-                width: 90,
-                height: 90,
-                backgroundColor: '#4F46E5',
-                borderRadius: 90,
-                left: '50%',
-                marginLeft: Platform.OS === 'ios' ? -85 : -45,
-                top: '50%',
-                marginTop: -40,
-                zIndex: -1,
-                shadowColor: '#4F46E5',
-                shadowOffset: {
-                  width: 0,
-                  height: 4,
-                },
-                shadowOpacity: 0.4,
-                shadowRadius: 8,
-                elevation: 12,
-              }}
-            />
-
-            {/* Profile */}
-            <TouchableOpacity
-              style={[
-                styles.optionButton,
-                selectedOption === 2 && styles.selectedOption,
-              ]}
-              onPress={handleProfileSelect}
-            >
-              <MaterialIcons
-                name="broadcast-on-personal"
-                size={24}
-                color={selectedOption === 2 ? 'white' : 'white'}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </CameraView>
+        </CameraView>
+      </Animated.View>
 
       {/* Bottom Sheet Modal */}
       <Modal
