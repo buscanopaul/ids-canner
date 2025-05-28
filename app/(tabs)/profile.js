@@ -227,13 +227,6 @@ export default function ProfileScreen() {
               </View>
 
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Username</Text>
-                <Text style={styles.detailValue}>
-                  {user?.username || 'Not provided'}
-                </Text>
-              </View>
-
-              <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Email Address</Text>
                 <Text style={styles.detailValue}>
                   {user?.primaryEmailAddress?.emailAddress || 'Not provided'}
@@ -402,12 +395,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 24,
     fontWeight: 'bold',
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
   },
   userEmail: {
     fontSize: 16,
