@@ -23,7 +23,7 @@ export default function SignInScreen() {
   });
   const router = useRouter();
 
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -34,8 +34,8 @@ export default function SignInScreen() {
   const handleSignIn = async () => {
     if (!isLoaded) return;
 
-    if (!username.trim()) {
-      Alert.alert('Error', 'Please enter your username or email');
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email');
       return;
     }
 
@@ -47,7 +47,7 @@ export default function SignInScreen() {
     setLoading(true);
     try {
       const signInAttempt = await signIn.create({
-        identifier: username.trim(),
+        identifier: email.trim(),
         password: password,
       });
 
@@ -109,15 +109,15 @@ export default function SignInScreen() {
         <Text style={styles.subtitle}>Sign in to your account</Text>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Username or Email</Text>
+          <Text style={styles.label}>Email</Text>
           <TextInput
             style={styles.input}
-            value={username}
-            onChangeText={setUsername}
-            placeholder="Enter your username or email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Enter your email"
             autoCapitalize="none"
-            autoComplete="username"
-            textContentType="username"
+            autoComplete="email"
+            textContentType="email"
             editable={!isAnyLoading}
             placeholderTextColor="#9CA3AF"
           />
