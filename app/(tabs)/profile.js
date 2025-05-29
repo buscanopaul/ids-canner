@@ -114,12 +114,24 @@ export default function ProfileScreen() {
         {
           text: 'Delete Account',
           style: 'destructive',
-          onPress: () => {
-            // In a real app, you would call an API to delete the account
-            Alert.alert(
-              'Account Deletion',
-              'Account deletion feature is coming soon. Please contact support for assistance.'
-            );
+          onPress: async () => {
+            try {
+              // Show loading state
+              Alert.alert('Deleting Account', 'Please wait while we delete your account...');
+              
+              // Delete the user account from Clerk
+              await user.delete();
+              
+              // The user will be automatically signed out after deletion
+              // No need to manually call signOut() as Clerk handles this
+            } catch (error) {
+              console.error('Error deleting account:', error);
+              Alert.alert(
+                'Error',
+                'Failed to delete account. Please try again or contact support.',
+                [{ text: 'OK' }]
+              );
+            }
           },
         },
       ]
