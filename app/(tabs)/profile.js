@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { useUser, useAuth } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
@@ -123,6 +124,31 @@ export default function ProfileScreen() {
         },
       ]
     );
+  };
+
+  const handleHelpSupport = () => {
+    const email = 'appedgescanner@gmail.com';
+    const subject = 'Help & Support Request';
+    const body = 'Hi, I need help with...';
+    
+    const emailUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    Linking.openURL(emailUrl).catch(() => {
+      Alert.alert(
+        'Email Not Available',
+        `Please send an email to ${email} for support.`,
+        [
+          {
+            text: 'Copy Email',
+            onPress: () => {
+              // Note: Clipboard requires @react-native-clipboard/clipboard package
+              Alert.alert('Email Address', email);
+            },
+          },
+          { text: 'OK' },
+        ]
+      );
+    });
   };
 
   const getUserInitials = () => {
@@ -276,21 +302,13 @@ export default function ProfileScreen() {
             <View style={styles.settingsList}>
               <TouchableOpacity style={styles.settingItem}>
                 <View style={styles.settingLeft}>
-                  <Text style={styles.settingIcon}>🔔</Text>
-                  <Text style={styles.settingLabel}>Notifications</Text>
-                </View>
-                <Text style={styles.settingArrow}>→</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.settingItem}>
-                <View style={styles.settingLeft}>
                   <Text style={styles.settingIcon}>🔒</Text>
                   <Text style={styles.settingLabel}>Privacy & Security</Text>
                 </View>
                 <Text style={styles.settingArrow}>→</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.settingItem}>
+              <TouchableOpacity style={styles.settingItem} onPress={handleHelpSupport}>
                 <View style={styles.settingLeft}>
                   <Text style={styles.settingIcon}>❓</Text>
                   <Text style={styles.settingLabel}>Help & Support</Text>
