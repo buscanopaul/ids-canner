@@ -14,12 +14,14 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "bundleIdentifier": "com.appedgescanner.edgescanner",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to scan QR codes and barcodes for nutrition information."
       }
     },
     "android": {
+      "package": "com.appedgescanner.edgescanner",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
