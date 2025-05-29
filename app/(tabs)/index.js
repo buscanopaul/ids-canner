@@ -31,6 +31,8 @@ export default function ScannerScreen() {
   const [hasPermission, setHasPermission] = useState(null);
   const [scanned, setScanned] = useState(false);
   const [flashMode, setFlashMode] = useState('off');
+  const [isFlashSupported, setIsFlashSupported] = useState(false);
+  const [flashAvailable, setFlashAvailable] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [selectedOption, setSelectedOption] = useState(1); // 0=manual, 1=scanner, 2=profile
   const [showBottomSheet, setShowBottomSheet] = useState(false);
@@ -167,7 +169,22 @@ export default function ScannerScreen() {
   };
 
   const toggleFlash = () => {
-    setFlashMode(flashMode === 'off' ? 'on' : 'off');
+    if (!flashAvailable) {
+      Alert.alert('Flash not available', 'Flash is not supported on this device');
+      return;
+    }
+    
+    const newFlashMode = flashMode === 'off' ? 'on' : 'off';
+    setFlashMode(newFlashMode);
+    
+    // Add some feedback to confirm flash state change
+    console.log('Flash toggled to:', newFlashMode);
+  };
+
+  // Add camera ready handler to check flash support
+  const handleCameraReady = () => {
+    // You can add flash capability checks here if needed
+    console.log('Camera is ready');
   };
 
   const handleManualInput = () => {
@@ -311,7 +328,9 @@ export default function ScannerScreen() {
           style={styles.camera}
           facing="back"
           flash={flashMode}
+          enableTorch={flashMode === 'on'}
           onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+          onCameraReady={handleCameraReady}
           barcodeScannerSettings={{
             barcodeTypes: [
               'qr',
