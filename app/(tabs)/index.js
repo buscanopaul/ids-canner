@@ -22,6 +22,9 @@ import { useUser } from '@clerk/clerk-expo';
 import { Entypo, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import LoadingDots from '../components/LoadingDots';
+import ScannedDataDisplay from '../components/ScannedDataDisplay';
+import DatabaseLookupDisplay from '../components/DatabaseLookupDisplay';
+import { parseIDData, validateParsedData } from '../utils/idDataParser';
 
 const { width, height } = Dimensions.get('window');
 
@@ -39,27 +42,15 @@ export default function ScannerScreen() {
   const [manualInput, setManualInput] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isScannerActive, setIsScannerActive] = useState(false);
-  const [selectedIdType, setSelectedIdType] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
+  const [scannedData, setScannedData] = useState(null);
+  const [showScannedData, setShowScannedData] = useState(false);
   const [profileButtonScale] = useState(new Animated.Value(1));
   const [screenOpacity] = useState(new Animated.Value(1));
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(300)).current;
   const scanLineAnim = useRef(new Animated.Value(0)).current;
-
-  const idTypes = [
-    'Driver\'s License',
-    'Senior Citizen',
-    'PWD ID',
-    'Passport',
-    'National ID',
-    'SSS ID',
-    'GSIS ID',
-    'PRC ID',
-    'OWWA ID',
-    'NBI Clearance',
-    'PSA Birth Certificate',
-  ];
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [status, setStatus] = useState('');
 
   useEffect(() => {
     const getCameraPermissions = async () => {
@@ -142,30 +133,53 @@ export default function ScannerScreen() {
     }
   }, [isScannerActive]);
 
-  const handleBarCodeScanned = ({ type, data }) => {
+  const handleBarCodeScanned = async ({ type, data }) => {
     if (scanned) return;
-
+    
     setScanned(true);
-    setIsScanning(true);
-    setIsScannerActive(false);
+    setIsProcessing(true);
+    setStatus('Looking up ID in database...');
 
-    // Simulate nutrition checking delay
-    setTimeout(() => {
-      setIsScanning(false);
-      Alert.alert(
-        'Scanned Successfully',
-        `Bar code with type ${type} and data ${data} has been scanned!`,
-        [
-          {
-            text: 'Scan Another',
-            onPress: () => {
-              setScanned(false);
-              setIsScannerActive(true);
-            },
-          },
-        ]
-      );
-    }, 2000);
+    try {
+      // Parse the scanned data and check database
+      const parsedData = await parseIDData(data, type);
+      
+      // Update status based on verification result
+      if (parsedData.isFromDatabase) {
+        setStatus('ID found in database!');
+      } else {
+        setStatus('ID processed successfully');
+      }
+      
+      setScannedData(parsedData);
+      setShowScannedData(true);
+    } catch (error) {
+      console.error('Parsing error:', error);
+      setStatus('Error processing ID');
+      
+      // Fallback to basic parsing
+      try {
+        const basicParsedData = {
+          idNumber: data, // Use raw data as fallback
+          firstName: '',
+          lastName: '',
+          middleInitial: '',
+          birthday: '',
+          idType: 'Unknown',
+          isFromDatabase: false,
+          verificationStatus: 'PARSE_ERROR',
+          scanSource: 'live_scan'
+        };
+        
+        setScannedData(basicParsedData);
+        setShowScannedData(true);
+      } catch (fallbackError) {
+        console.error('Fallback parsing failed:', fallbackError);
+        Alert.alert('Error', 'Failed to process the scanned code');
+      }
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const toggleFlash = () => {
@@ -193,28 +207,16 @@ export default function ScannerScreen() {
     setFlashMode('off');
     setShowBottomSheet(true);
     setManualInput('');
-    setSelectedIdType('');
-    setShowDropdown(false);
+    setIsVerifying(false);
   };
 
   const closeBottomSheet = () => {
     setShowBottomSheet(false);
     setManualInput('');
-    setSelectedIdType('');
-    setShowDropdown(false);
     setIsVerifying(false);
   };
 
-  const handleDropdownSelect = (idType) => {
-    setSelectedIdType(idType);
-    setShowDropdown(false);
-  };
-
-  const handleVerifyInput = () => {
-    if (!selectedIdType) {
-      Alert.alert('Error', 'Please select an ID type');
-      return;
-    }
+  const handleVerifyInput = async () => {
     if (!manualInput.trim()) {
       Alert.alert('Error', 'Please enter an ID number');
       return;
@@ -222,20 +224,21 @@ export default function ScannerScreen() {
 
     setIsVerifying(true);
 
-    // Simulate verification process
-    setTimeout(() => {
+    try {
+      // Use the same ID parser to test manual input
+      const mockData = `${manualInput.trim()}`;
+      const parsedData = await parseIDData(mockData, 'manual');
+      
+      // Set the parsed data and show the result
+      setScannedData(parsedData);
       setIsVerifying(false);
-      Alert.alert(
-        'Verification Complete',
-        `${selectedIdType} with ID "${manualInput}" has been verified!`,
-        [
-          {
-            text: 'OK',
-            onPress: closeBottomSheet,
-          },
-        ]
-      );
-    }, 2000);
+      closeBottomSheet();
+      setShowScannedData(true);
+    } catch (error) {
+      console.error('Manual verification error:', error);
+      setIsVerifying(false);
+      Alert.alert('Error', 'Failed to verify ID number');
+    }
   };
 
   const handleScannerSelect = () => {
@@ -267,6 +270,20 @@ export default function ScannerScreen() {
     setTimeout(() => {
       router.push('/(tabs)/profile');
     }, 200);
+  };
+
+  const handleCloseScannedData = () => {
+    setShowScannedData(false);
+    setScannedData(null);
+    setScanned(false);
+    setIsScannerActive(true);
+  };
+
+  const handleScanAnotherFromDisplay = () => {
+    setShowScannedData(false);
+    setScannedData(null);
+    setScanned(false);
+    setIsScannerActive(true);
   };
 
   const handleLogoPress = () => {
@@ -421,11 +438,11 @@ export default function ScannerScreen() {
           </View>
 
           {/* Status Text */}
-          {isScanning && (
+          {isProcessing && (
             <View style={styles.statusContainer}>
               <View style={styles.statusBubble}>
                 <Text style={styles.statusText}>
-                  Checking nutrition details...
+                  {status}
                 </Text>
                 <LoadingDots />
               </View>
@@ -527,59 +544,18 @@ export default function ScannerScreen() {
                   {/* Content */}
                   <View style={styles.bottomSheetContent}>
                     <Text style={styles.bottomSheetTitle}>
-                      Enter ID Information
+                      Test ID Lookup
                     </Text>
                     <Text style={styles.bottomSheetSubtitle}>
-                      Select ID type and enter ID number for verification
+                      Enter an ID number to test database lookup
                     </Text>
-                    
-                    {/* ID Type Dropdown */}
-                    <TouchableOpacity
-                      style={[
-                        styles.dropdownButton,
-                        isVerifying && styles.dropdownButtonDisabled
-                      ]}
-                      onPress={() => !isVerifying && setShowDropdown(!showDropdown)}
-                      disabled={isVerifying}
-                    >
-                      <Text style={[
-                        styles.dropdownButtonText,
-                        !selectedIdType && styles.dropdownPlaceholder,
-                        isVerifying && styles.dropdownTextDisabled
-                      ]}>
-                        {selectedIdType || 'Select ID Type'}
-                      </Text>
-                      <Ionicons 
-                        name={showDropdown ? 'chevron-up' : 'chevron-down'} 
-                        size={20} 
-                        color={isVerifying ? "#CCC" : "#666"} 
-                      />
-                    </TouchableOpacity>
-                    
-                    {/* Dropdown List */}
-                    {showDropdown && !isVerifying && (
-                      <ScrollView style={styles.dropdownList}>
-                        {idTypes.map((idType, index) => (
-                          <TouchableOpacity
-                            key={index}
-                            style={[
-                              styles.dropdownItem,
-                              index === idTypes.length - 1 && styles.dropdownItemLast
-                            ]}
-                            onPress={() => handleDropdownSelect(idType)}
-                          >
-                            <Text style={styles.dropdownItemText}>{idType}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    )}
                     
                     <TextInput
                       style={[
                         styles.textInput,
                         isVerifying && styles.textInputDisabled
                       ]}
-                      placeholder="Enter ID number"
+                      placeholder="Enter ID number (e.g., 191-589-009-000)"
                       placeholderTextColor={isVerifying ? "#CCC" : "#999"}
                       value={manualInput}
                       onChangeText={setManualInput}
@@ -598,11 +574,11 @@ export default function ScannerScreen() {
                     >
                       {isVerifying ? (
                         <View style={styles.verifyingContainer}>
-                          <Text style={styles.verifyButtonText}>Verifying...</Text>
+                          <Text style={styles.verifyButtonText}>Looking up...</Text>
                           <LoadingDots />
                         </View>
                       ) : (
-                        <Text style={styles.verifyButtonText}>Verify</Text>
+                        <Text style={styles.verifyButtonText}>Lookup ID</Text>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -612,6 +588,22 @@ export default function ScannerScreen() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      {/* Scanned Data Display Modal */}
+      {showScannedData && scannedData && (
+        <DatabaseLookupDisplay
+          data={scannedData}
+          onClose={() => {
+            setShowScannedData(false);
+            setScannedData(null);
+          }}
+          onScanAnother={() => {
+            setShowScannedData(false);
+            setScannedData(null);
+            setScanned(false);
+          }}
+        />
+      )}
     </View>
   );
 }

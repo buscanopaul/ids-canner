@@ -17,6 +17,13 @@ export default function TabLayout() {
         }}
       />
       <Stack.Screen 
+        name="history" 
+        options={{
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+        }}
+      />
+      <Stack.Screen 
         name="profile" 
         options={{
           animation: 'slide_from_right',

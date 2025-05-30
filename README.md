@@ -1,293 +1,145 @@
-# Edge Scanner - Modern Authentication App
+# Edge Scanner - React Native ID Scanner App
 
-A React Native Expo app with Clerk authentication featuring username/password sign-in and social OAuth providers.
+A React Native Expo application that scans barcodes and QR codes to extract ID information including:
+- ID Number
+- First Name  
+- Last Name
+- Middle Initial
+- Birthday
+- Photo (when available)
 
 ## Features
 
-- **Username/Password Authentication**: Standard email and password sign-in
-- **Social Sign-In**: Google OAuth (and Apple on iOS)
-- **Email Verification**: Secure account verification via email
-- **User Profile Management**: Complete user profile with first name, last name, username, and email
-- **Modern UI**: Clean, responsive design with proper loading states
+- **Barcode/QR Code Scanning**: Uses device camera to scan various barcode and QR code formats
+- **ID Data Parsing**: Automatically extracts structured data from scanned codes
+- **Multiple ID Formats**: Supports Philippine IDs, US Driver's Licenses, and generic formats
+- **Beautiful UI**: Modern, intuitive interface with animations
+- **Data Display**: Shows parsed information in an organized, shareable format
+- **Manual Input**: Alternative manual entry option for unscannable IDs
 
-## Authentication Flow
+## Installation
 
-### 1. Sign In
-
-- **Username/Password**: Users can sign in with username or email + password
-- **Google OAuth**: One-click sign-in with Google account
-- **Apple OAuth**: One-click sign-in with Apple ID (iOS only)
-- **Direct Authentication**: No verification codes needed for existing users
-
-### 2. Sign Up (New Users)
-
-- **Complete Registration Form**: First name, last name, username, email, password
-- **Password Validation**: Minimum 8 characters with confirmation
-- **Email Verification**: 6-digit code sent to email address
-- **Account Activation**: Session activated after email verification
-
-### 3. Email Verification
-
-- **6-digit Code**: Secure verification sent to user's email
-- **Auto-advance**: Automatic focus between input fields
-- **Auto-submit**: Submits when all digits are entered
-- **Resend Option**: Easy code resend functionality
-
-## Project Setup
-
-### Prerequisites
-
-- Node.js 18+
-- Bun package manager
-- Expo CLI
-- iOS Simulator or Android Emulator
-
-### Installation
-
-1. **Clone and install dependencies:**
-
-   ```bash
-   git clone <repository-url>
-   cd edge-scanner
-   bun install
-   ```
-
-2. **Set up environment variables:**
-   Create a `.env` file in the root directory:
-
-   ```
-   EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key_here
-   ```
-
-3. **Configure Clerk Dashboard:**
-   - Create a new Clerk application
-   - Enable email/password authentication
-   - Configure OAuth providers (Google, Apple)
-   - Set up email provider for verification
-   - Copy the publishable key to your `.env` file
-
-### Running the App
-
+1. Install dependencies:
 ```bash
-# Start development server
-bun start
-
-# Run on iOS
-bun ios
-
-# Run on Android
-bun android
+npm install
+# or
+bun install
 ```
 
-## Project Structure
-
-```
-app/
-├── _layout.js                 # Root layout with Clerk provider and auth routing
-├── (auth)/                    # Authentication screens group
-│   ├── sign-in.js            # Username/password + OAuth sign-in
-│   ├── sign-up.js            # User registration form
-│   └── verification.js        # Email verification
-└── (tabs)/                    # Main app screens (authenticated)
-    ├── index.js              # Home screen
-    └── profile.js            # User profile and settings
+2. Run the development server:
+```bash
+npx expo start
 ```
 
-## Key Components
+## Usage
 
-### Sign-In Screen (`app/(auth)/sign-in.js`)
+### Scanning IDs
 
-- **Username/Email Input**: Accepts both username and email
-- **Password Input**: Secure password entry
-- **OAuth Buttons**: Google and Apple sign-in options
-- **Navigation**: Link to sign-up for new users
-- **Error Handling**: Comprehensive error messages
+1. Tap the scanner button (middle button) to activate the camera
+2. Point your camera at a barcode or QR code containing ID information
+3. The app will automatically detect and parse the data
+4. View the extracted information in the results screen
 
-### Sign-Up Screen (`app/(auth)/sign-up.js`)
+### Sample QR Code Data Formats
 
-- **Complete Profile Form**: First name, last name, username, email
-- **Password Fields**: Password and confirmation with validation
-- **Email Validation**: Real-time email format checking
-- **Form Validation**: All required fields with proper error messages
+To test the scanner, you can generate QR codes with the following sample data formats:
 
-### Verification Screen (`app/(auth)/verification.js`)
+#### Philippine Driver's License Format:
+```
+A01-23-456789
+DELA CRUZ, JUAN M
+01/15/1990
+REPUBLIC OF THE PHILIPPINES
+DRIVER'S LICENSE
+```
 
-- **6-digit Code Input**: Individual input fields for each digit
-- **Auto-advance**: Automatic focus progression
-- **Auto-submit**: Submits when complete
-- **Resend Functionality**: Easy code resend option
-- **Email Display**: Shows verification email address
+#### Alternative Philippine Driver's License Format:
+```
+A12345678901
+SANTOS, MARIA C
+12/25/1985
+DRIVER'S LICENSE
+REPUBLIC OF THE PHILIPPINES
+```
 
-### Profile Screen (`app/(tabs)/profile.js`)
+#### Philippine National ID Format:
+```
+1234-5678-9012
+REYES, JOSE P
+03/10/1980
+PHILIPPINE IDENTIFICATION SYSTEM
+```
 
-- **User Information**: First name, last name, username, email
-- **Account Details**: Creation date, last sign-in
-- **Settings Options**: Notifications, privacy, help
-- **Sign Out**: Secure session termination
+#### SSS ID Format:
+```
+12-3456789-0
+GARCIA, ANA L
+06/20/1992
+SOCIAL SECURITY SYSTEM
+```
 
-## Technical Details
+#### US Driver's License Format (PDF417):
+```
+ANSI 6360340102DL00410288ZA03290015DLDAQ123456789
+DCSDOE
+DCTJOHN
+DCUM
+DBB01151990
+```
 
-### Dependencies
+#### Generic Format:
+```
+ID: ABC123456789
+Name: John M. Doe
+Birthday: 01/15/1990
+```
 
-- **expo-router**: File-based routing (v4.0.21 for SDK 52 compatibility)
-- **@clerk/clerk-expo**: Authentication provider with OAuth support
-- **expo-secure-store**: Secure token storage
+### Supported Philippine ID Types
+
+The app can automatically detect and parse the following Philippine ID types:
+
+- **Philippine Driver's License** (A01-23-456789 format)
+- **Philippine National ID** (1234-5678-9012 format)
+- **SSS ID** (12-3456789-0 format)
+- **UMID** (1234-5678901-2 format)
+- **PRC License** (PRC-1234567 format)
+- **Postal ID** (POST-1234-567890 format)
+- **Other Philippine Government IDs**
+
+### Supported Barcode Types
+
+- QR Code
+- Code 128
+- Code 39  
+- EAN-13
+- EAN-8
+- UPC-A
+- UPC-E
+- Codabar
+
+## Architecture
+
+- **Scanner Screen**: Main camera interface with barcode detection
+- **Data Parser**: Utility functions to extract structured data from raw scan results
+- **Results Display**: Modal component showing parsed ID information
+- **Manual Input**: Alternative input method for edge cases
+
+## Dependencies
+
+- **expo-camera**: Camera functionality and barcode scanning
+- **@expo/vector-icons**: UI icons
+- **@clerk/clerk-expo**: Authentication (existing)
+- **expo-router**: Navigation
 - **react-native-safe-area-context**: Safe area handling
-- **react-native-screens**: Native screen components
-
-### Authentication Logic
-
-- **Username/Password**: Standard Clerk email/password authentication
-- **OAuth Integration**: Google and Apple OAuth flows
-- **Email Verification**: Secure account verification process
-- **Session Management**: Automatic session handling with secure storage
-- **Conditional Routing**: Smart navigation based on authentication state
-
-### Form Validation
-
-- **Email Format**: Real-time email validation
-- **Password Strength**: Minimum 8 characters requirement
-- **Password Confirmation**: Matching password validation
-- **Required Fields**: All fields validated before submission
-
-## Security Considerations
-
-- **Secure Authentication**: Industry-standard OAuth and password authentication
-- **Email Verification**: Required email verification for account security
-- **Session Management**: Secure token storage and session handling
-- **Input Validation**: Comprehensive client-side and server-side validation
-- **Error Handling**: Secure error messages without sensitive information exposure
-
-## OAuth Configuration
-
-### Google OAuth Setup
-
-1. **Google Cloud Console**:
-
-   - Create new project or use existing
-   - Enable Google+ API
-   - Create OAuth 2.0 credentials
-   - Add authorized redirect URIs
-
-2. **Clerk Dashboard**:
-   - Navigate to OAuth providers
-   - Enable Google provider
-   - Add client ID and secret
-   - Configure scopes and settings
-
-### Apple OAuth Setup (iOS)
-
-1. **Apple Developer Account**:
-
-   - Create App ID with Sign in with Apple capability
-   - Configure Sign in with Apple service
-
-2. **Clerk Dashboard**:
-   - Enable Apple provider
-   - Configure team ID and key ID
-   - Upload private key file
-
-## Customization
-
-### Styling
-
-- **React Native StyleSheet**: No external CSS frameworks
-- **Modern Design**: Clean, consistent UI components
-- **Responsive Layout**: Works on various screen sizes
-- **Loading States**: Proper loading indicators for all actions
-
-### Email Provider Setup
-
-Configure your preferred email provider in Clerk dashboard:
-
-- **Clerk Email**: Built-in email service
-- **SendGrid**: Popular email service
-- **AWS SES**: Amazon email service
-- **Custom SMTP**: For advanced configurations
-
-### Form Customization
-
-- **Validation Rules**: Modify password requirements
-- **Field Options**: Add or remove form fields
-- **UI Components**: Customize input styles and layouts
-- **Error Messages**: Personalize error message text
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Clerk Key Missing**
-
-   - Ensure `.env` file exists with correct publishable key
-   - Restart development server after adding environment variables
-
-2. **OAuth Not Working**
-
-   - Check OAuth provider configuration in Clerk dashboard
-   - Verify client IDs and secrets are correct
-   - Ensure redirect URIs are properly configured
-
-3. **Email Verification Issues**
-
-   - Check email provider configuration
-   - Verify email delivery settings
-   - Check spam/junk folders for verification emails
-
-4. **Navigation Issues**
-   - Clear Expo cache: `expo start --clear`
-   - Restart development server
-   - Check for JavaScript errors in console
 
 ## Development
 
-### Adding New Features
-
-1. Create new screens in appropriate groups (`(auth)` or `(tabs)`)
-2. Update routing logic in `_layout.js` if needed
-3. Add navigation links between screens
-4. Test authentication flow thoroughly
-
-### Testing
-
-- Test username and email sign-in variations
-- Verify OAuth flows on different platforms
-- Test email verification process
-- Validate form inputs and error handling
-- Test on both iOS and Android platforms
-
-## Production Deployment
-
-1. **Environment Setup**
-
-   - Set up production Clerk environment
-   - Configure production OAuth providers
-   - Set up production email provider
-   - Update environment variables
-
-2. **Build Configuration**
-
-   - Update `app.json` with production settings
-   - Configure signing certificates
-   - Set up app store metadata
-   - Configure OAuth redirect URIs for production
-
-3. **Security Checklist**
-   - Review OAuth configuration security
-   - Implement proper session management
-   - Add rate limiting and abuse protection
-   - Configure proper CORS and API security
-   - Test email delivery in production
-
-## Support
-
-For issues and questions:
-
-- Check Clerk documentation for authentication setup
-- Review Expo Router documentation for navigation
-- Test OAuth flows on physical devices
-- Monitor Clerk dashboard for authentication analytics
-- Check email provider logs for delivery issues
+The app is built with:
+- React Native + Expo SDK 52
+- Modern React hooks (useState, useEffect, useRef)
+- Animated API for smooth UI transitions
+- TypeScript-ready architecture
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License
