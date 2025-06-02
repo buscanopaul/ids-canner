@@ -351,13 +351,6 @@ export default function ScannerScreen() {
           barcodeScannerSettings={{
             barcodeTypes: [
               'qr',
-              'ean13',
-              'ean8',
-              'code128',
-              'code39',
-              'upc_a',
-              'upc_e',
-              'codabar',
             ],
           }}
         >
@@ -428,10 +421,10 @@ export default function ScannerScreen() {
             {isScannerActive && !scanned && !isScanning && (
               <View style={styles.activeScanContainer}>
                 <Text style={styles.activeScanText}>
-                  🔍 Scanning Active
+                  🔍 QR Scanner Active
                 </Text>
                 <Text style={styles.activeScanSubtext}>
-                  Point your camera at a barcode or QR code
+                  Point your camera at a QR code
                 </Text>
               </View>
             )}

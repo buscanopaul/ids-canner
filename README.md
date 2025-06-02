@@ -1,6 +1,6 @@
-# Edge Scanner - React Native ID Scanner App
+# Edge Scanner - React Native QR Code Scanner App
 
-A React Native Expo application that scans barcodes and QR codes to extract ID information including:
+A React Native Expo application that scans QR codes to extract ID information including:
 - ID Number
 - First Name  
 - Last Name
@@ -10,8 +10,8 @@ A React Native Expo application that scans barcodes and QR codes to extract ID i
 
 ## Features
 
-- **Barcode/QR Code Scanning**: Uses device camera to scan various barcode and QR code formats
-- **ID Data Parsing**: Automatically extracts structured data from scanned codes
+- **QR Code Scanning**: Uses device camera to scan QR codes containing ID information
+- **ID Data Parsing**: Automatically extracts structured data from scanned QR codes
 - **Multiple ID Formats**: Supports Philippine IDs, US Driver's Licenses, and generic formats
 - **Beautiful UI**: Modern, intuitive interface with animations
 - **Data Display**: Shows parsed information in an organized, shareable format
