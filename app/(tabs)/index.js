@@ -346,7 +346,7 @@ export default function ScannerScreen() {
           facing="back"
           flash={flashMode}
           enableTorch={flashMode === 'on'}
-          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+          onBarcodeScanned={scanned || !isScannerActive ? undefined : handleBarCodeScanned}
           onCameraReady={handleCameraReady}
           barcodeScannerSettings={{
             barcodeTypes: [
