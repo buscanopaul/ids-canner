@@ -18,6 +18,7 @@ export default function App() {
   const [showLookupResult, setShowLookupResult] = useState(false);
   const [isProcessingQR, setIsProcessingQR] = useState(false);
   const [flashMode, setFlashMode] = useState('off');
+  const [isCameraOn, setIsCameraOn] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -30,10 +31,16 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!isScanning) {
+    if (!isScanning || !isCameraOn) {
       setFlashMode('off');
     }
-  }, [isScanning]);
+  }, [isScanning, isCameraOn]);
+
+  useEffect(() => {
+    if (!isCameraOn) {
+      setIsScanning(false);
+    }
+  }, [isCameraOn]);
 
   useEffect(() => {
     setIsScanning(false);
@@ -78,6 +85,10 @@ export default function App() {
   };
 
   const startScanning = () => {
+    if (!isCameraOn) {
+      Alert.alert('Turn On Camera', 'Please turn on the camera first before scanning');
+      return;
+    }
     setIsScanning(true);
     setScanned(false);
   };
@@ -167,9 +178,18 @@ export default function App() {
     setIsScanning(true);
   };
 
+  const toggleCamera = () => {
+    setIsCameraOn(!isCameraOn);
+    if (isCameraOn) {
+      // Turning off camera also stops scanning
+      setIsScanning(false);
+      setFlashMode('off');
+    }
+  };
+
   const toggleFlash = () => {
-    if (!isScanning) {
-      Alert.alert('Start Scanning First', 'Please start scanning before using the flash');
+    if (!isScanning || !isCameraOn) {
+      Alert.alert('Start Scanning First', 'Please turn on camera and start scanning before using the flash');
       return;
     }
     const newFlashMode = flashMode === 'off' ? 'on' : 'off';
@@ -220,54 +240,117 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        style={styles.camera}
-        facing="back"
-        torch={flashMode === 'on'}
-        onBarcodeScanned={isScanning && !showLookupResult && !isProcessingQR ? handleBarCodeScanned : undefined}
-        barcodeScannerSettings={{
-          barcodeTypes: ['qr', 'pdf417'],
-        }}
-      >
-        <View style={styles.topControls}>
-          <TouchableOpacity style={styles.logoButton} onPress={handleLogoPress}>
-            <Image
-              source={require('../../assets/logo_edgescanner.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
+      {isCameraOn ? (
+        <CameraView
+          style={styles.camera}
+          facing="back"
+          torch={flashMode === 'on'}
+          onBarcodeScanned={isScanning && !showLookupResult && !isProcessingQR ? handleBarCodeScanned : undefined}
+          barcodeScannerSettings={{
+            barcodeTypes: ['qr', 'pdf417'],
+          }}
+        >
+          <View style={styles.topControls}>
+            <TouchableOpacity style={styles.logoButton} onPress={handleLogoPress}>
+              <Image
+                source={require('../../assets/logo_edgescanner.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.flashButton,
-              flashMode === 'on' && styles.flashButtonActive,
-              !isScanning && styles.flashButtonDisabled,
-            ]}
-            onPress={toggleFlash}
-          >
-            <Ionicons
-              name={flashMode === 'on' ? 'flash' : 'flash-off'}
-              size={18}
-              color={!isScanning ? '#ccc' : 'black'}
-            />
-          </TouchableOpacity>
-        </View>
+            <View style={styles.rightControls}>
+              <TouchableOpacity
+                style={styles.cameraButton}
+                onPress={toggleCamera}
+              >
+                <Ionicons
+                  name="videocam"
+                  size={18}
+                  color="black"
+                />
+              </TouchableOpacity>
 
-        <View style={styles.overlay}>
-          <View style={styles.unfocusedContainer}></View>
-          <View style={styles.middleContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.flashButton,
+                  flashMode === 'on' && styles.flashButtonActive,
+                  (!isScanning || !isCameraOn) && styles.flashButtonDisabled,
+                ]}
+                onPress={toggleFlash}
+              >
+                <Ionicons
+                  name={flashMode === 'on' ? 'flash' : 'flash-off'}
+                  size={18}
+                  color={(!isScanning || !isCameraOn) ? '#ccc' : 'black'}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.overlay}>
             <View style={styles.unfocusedContainer}></View>
-            <View style={styles.focusedContainer}>
-              <Text style={styles.scanText}>
-                {isScanning ? 'Scanning for QR Code...' : 'Ready to Scan'}
-              </Text>
+            <View style={styles.middleContainer}>
+              <View style={styles.unfocusedContainer}></View>
+              <View style={styles.focusedContainer}>
+                {/* Corner Brackets */}
+                <View style={[styles.cornerBracket, styles.topLeft]} />
+                <View style={[styles.cornerBracket, styles.topRight]} />
+                <View style={[styles.cornerBracket, styles.bottomLeft]} />
+                <View style={[styles.cornerBracket, styles.bottomRight]} />
+                
+                <Text style={styles.scanText}>
+                  {isScanning ? 'Scanning for QR Code...' : 'Click the scan button to start'}
+                </Text>
+              </View>
+              <View style={styles.unfocusedContainer}></View>
             </View>
             <View style={styles.unfocusedContainer}></View>
           </View>
-          <View style={styles.unfocusedContainer}></View>
+        </CameraView>
+      ) : (
+        <View style={styles.cameraOff}>
+          <View style={styles.topControls}>
+            <TouchableOpacity style={styles.logoButton} onPress={handleLogoPress}>
+              <Image
+                source={require('../../assets/logo_edgescanner.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+
+            <View style={styles.rightControls}>
+              <TouchableOpacity
+                style={[styles.cameraButton, styles.cameraButtonOff]}
+                onPress={toggleCamera}
+              >
+                <Ionicons
+                  name="videocam-off"
+                  size={18}
+                  color="white"
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.flashButton, styles.flashButtonDisabled]}
+                onPress={toggleFlash}
+              >
+                <Ionicons
+                  name="flash-off"
+                  size={18}
+                  color="#ccc"
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.cameraOffContent}>
+            <Ionicons name="videocam-off" size={80} color="#666" />
+            <Text style={styles.cameraOffText}>Camera is off</Text>
+            <Text style={styles.cameraOffSubtext}>Tap the camera button to turn it back on</Text>
+          </View>
         </View>
-      </CameraView>
+      )}
       
       <View style={styles.buttonContainer}>
         <View style={styles.bottomNavigation}>
@@ -387,7 +470,7 @@ const styles = StyleSheet.create({
   },
   unfocusedContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'transparent',
   },
   middleContainer: {
     flexDirection: 'row',
@@ -398,9 +481,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#fff',
-    borderRadius: 10,
+    position: 'relative',
   },
   scanText: {
     color: '#fff',
@@ -569,11 +650,58 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  rightControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cameraButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
       height: 2,
     },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  cameraButtonOff: {
+    backgroundColor: '#666',
+  },
+  cameraOff: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  cameraOffContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  cameraOffText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  cameraOffSubtext: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   flashButton: {
     width: 40,
@@ -597,5 +725,42 @@ const styles = StyleSheet.create({
   flashButtonDisabled: {
     backgroundColor: '#f0f0f0',
     opacity: 0.6,
+  },
+  cornerBracket: {
+    width: 30,
+    height: 30,
+    position: 'absolute',
+  },
+  topLeft: {
+    top: 20,
+    left: 20,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: '#fff',
+    borderTopLeftRadius: 5,
+  },
+  topRight: {
+    top: 20,
+    right: 20,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderColor: '#fff',
+    borderTopRightRadius: 5,
+  },
+  bottomLeft: {
+    bottom: 20,
+    left: 20,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: '#fff',
+    borderBottomLeftRadius: 5,
+  },
+  bottomRight: {
+    bottom: 20,
+    right: 20,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderColor: '#fff',
+    borderBottomRightRadius: 5,
   },
 });
