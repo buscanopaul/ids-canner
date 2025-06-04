@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, Alert, TouchableOpacity, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, Text, View, Alert, TouchableOpacity, Modal, TextInput, KeyboardAvoidingView, Platform, Image, Linking } from 'react-native';
 import { CameraView, Camera } from 'expo-camera';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import AppwriteService from '../services/appwriteService';
 import DatabaseLookupDisplay from '../components/DatabaseLookupDisplay';
 import { parseIDData } from '../utils/idDataParser';
@@ -16,6 +17,7 @@ export default function App() {
   const [lookupResult, setLookupResult] = useState(null);
   const [showLookupResult, setShowLookupResult] = useState(false);
   const [isProcessingQR, setIsProcessingQR] = useState(false);
+  const [flashMode, setFlashMode] = useState('off');
   const router = useRouter();
 
   useEffect(() => {
@@ -26,6 +28,16 @@ export default function App() {
 
     getCameraPermissions();
   }, []);
+
+  useEffect(() => {
+    if (!isScanning) {
+      setFlashMode('off');
+    }
+  }, [isScanning]);
+
+  useEffect(() => {
+    setIsScanning(false);
+  }, [showLookupResult]);
 
   const handleBarCodeScanned = async ({ type, data }) => {
     if (scanned || isProcessingQR) return; // Prevent multiple scans
@@ -148,15 +160,46 @@ export default function App() {
     setIsProcessingQR(false); // Reset processing state
   };
 
-  useEffect(() => {
-    setIsScanning(false);
-  }, [showLookupResult]);
-
   const handleScanAnother = () => {
     setShowLookupResult(false);
     setLookupResult(null);
     setScanned(false);
     setIsScanning(true);
+  };
+
+  const toggleFlash = () => {
+    if (!isScanning) {
+      Alert.alert('Start Scanning First', 'Please start scanning before using the flash');
+      return;
+    }
+    const newFlashMode = flashMode === 'off' ? 'on' : 'off';
+    setFlashMode(newFlashMode);
+  };
+
+  const handleLogoPress = () => {
+    const appId = 'your-app-id'; // Replace with your actual app ID
+    let storeUrl;
+
+    if (Platform.OS === 'ios') {
+      // iOS App Store URL for reviews
+      storeUrl = `https://apps.apple.com/app/id${appId}?action=write-review`;
+    } else {
+      // Google Play Store URL for reviews
+      storeUrl = `https://play.google.com/store/apps/details?id=com.appedgescanner.edgescanner&showAllReviews=true`;
+    }
+
+    Linking.canOpenURL(storeUrl)
+      .then((supported) => {
+        if (supported) {
+          Linking.openURL(storeUrl);
+        } else {
+          Alert.alert('Error', 'Unable to open app store');
+        }
+      })
+      .catch((err) => {
+        console.error('Error opening app store:', err);
+        Alert.alert('Error', 'Unable to open app store');
+      });
   };
 
   if (hasPermission === null) {
@@ -180,11 +223,37 @@ export default function App() {
       <CameraView
         style={styles.camera}
         facing="back"
+        torch={flashMode === 'on'}
         onBarcodeScanned={isScanning && !showLookupResult && !isProcessingQR ? handleBarCodeScanned : undefined}
         barcodeScannerSettings={{
           barcodeTypes: ['qr', 'pdf417'],
         }}
       >
+        <View style={styles.topControls}>
+          <TouchableOpacity style={styles.logoButton} onPress={handleLogoPress}>
+            <Image
+              source={require('../../assets/logo_edgescanner.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.flashButton,
+              flashMode === 'on' && styles.flashButtonActive,
+              !isScanning && styles.flashButtonDisabled,
+            ]}
+            onPress={toggleFlash}
+          >
+            <Ionicons
+              name={flashMode === 'on' ? 'flash' : 'flash-off'}
+              size={18}
+              color={!isScanning ? '#ccc' : 'black'}
+            />
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.overlay}>
           <View style={styles.unfocusedContainer}></View>
           <View style={styles.middleContainer}>
@@ -461,5 +530,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  topControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  logoButton: {
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  flashButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  flashButtonActive: {
+    backgroundColor: '#FFD700',
+  },
+  flashButtonDisabled: {
+    backgroundColor: '#f0f0f0',
+    opacity: 0.6,
   },
 });
