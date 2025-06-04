@@ -391,45 +391,60 @@ export default function App() {
         animationType="slide"
         onRequestClose={closeManualInput}
       >
-        <KeyboardAvoidingView
-          style={styles.modalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Enter ID Number</Text>
-            <Text style={styles.modalSubtitle}>Type the ID number manually</Text>
-            
-            <TextInput
-              style={styles.textInput}
-              placeholder="Enter ID number"
-              placeholderTextColor="#999"
-              value={manualIdInput}
-              onChangeText={setManualIdInput}
-              returnKeyType="done"
-              onSubmitEditing={submitManualId}
-              autoFocus={true}
-            />
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+        <View style={styles.modernModalOverlay}>
+          <KeyboardAvoidingView
+            style={styles.modernModalContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View style={styles.modernModalContent}>
+              {/* Close Button */}
+              <TouchableOpacity 
+                style={styles.closeButton}
                 onPress={closeManualInput}
               >
-                <Text style={styles.modalButtonText}>Cancel</Text>
+                <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
+
+              {/* Illustration */}
+              <View style={styles.illustrationContainer}>
+                <View style={styles.idCardIllustration}>
+                  <Ionicons name="card" size={48} color="#4F46E5" />
+                </View>
+              </View>
+
+              {/* Title */}
+              <Text style={styles.modernModalTitle}>Enter ID Number</Text>
               
+              {/* Description */}
+              <Text style={styles.modernModalDescription}>
+                Type the ID number manually to search our database for verification
+              </Text>
+              
+              {/* Input Field */}
+              <TextInput
+                style={styles.modernTextInput}
+                placeholder="Enter ID number"
+                placeholderTextColor="#999"
+                value={manualIdInput}
+                onChangeText={setManualIdInput}
+                returnKeyType="done"
+                onSubmitEditing={submitManualId}
+                autoFocus={true}
+              />
+              
+              {/* Search Button */}
               <TouchableOpacity
-                style={[styles.modalButton, styles.submitButton]}
+                style={[styles.modernButton, isSearching && styles.modernButtonDisabled]}
                 onPress={submitManualId}
                 disabled={isSearching}
               >
-                <Text style={styles.modalButtonText}>
+                <Text style={styles.modernButtonText}>
                   {isSearching ? 'Searching...' : 'Search Database'}
                 </Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Processing QR Code Overlay */}
@@ -537,69 +552,103 @@ const styles = StyleSheet.create({
   centerButtonActive: {
     backgroundColor: '#DC3545',
   },
-  modalContainer: {
+  modernModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modernModalContainer: {
+    justifyContent: 'flex-end',
+  },
+  modernModalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 40,
+    minHeight: 400,
+    position: 'relative',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 16,
+    right: 24,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    zIndex: 10,
   },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 20,
-    width: '100%',
-    maxWidth: 350,
+  illustrationContainer: {
     alignItems: 'center',
+    marginTop: 40,
+    marginBottom: 24,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+  idCardIllustration: {
+    width: 100,
+    height: 70,
+    backgroundColor: '#f8f9ff',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e5e7ff',
   },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
+  modernModalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1a1a1a',
     textAlign: 'center',
+    marginBottom: 12,
   },
-  textInput: {
+  modernModalDescription: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 32,
+    paddingHorizontal: 8,
+  },
+  modernTextInput: {
     width: '100%',
-    height: 50,
-    borderColor: '#ddd',
+    height: 56,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    fontSize: 16,
+    color: '#1a1a1a',
+    marginBottom: 24,
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
-    marginBottom: 20,
+    borderColor: '#e9ecef',
   },
-  modalButtons: {
-    flexDirection: 'row',
+  modernButton: {
     width: '100%',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  modalButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 8,
+    height: 56,
+    backgroundColor: '#8BC34A',
+    borderRadius: 16,
+    justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#8BC34A',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  cancelButton: {
-    backgroundColor: '#666',
+  modernButtonDisabled: {
+    backgroundColor: '#ccc',
+    shadowOpacity: 0,
+    elevation: 0,
   },
-  submitButton: {
-    backgroundColor: '#28A745',
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#9CA3AF',
-  },
-  modalButtonText: {
+  modernButtonText: {
+    fontSize: 18,
+    fontWeight: '600',
     color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   processingOverlay: {
     flex: 1,
