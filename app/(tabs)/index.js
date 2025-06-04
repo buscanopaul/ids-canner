@@ -354,12 +354,12 @@ export default function App() {
       
       <View style={styles.buttonContainer}>
         <View style={styles.bottomNavigation}>
-          {/* Manual Input - Lock Icon */}
+          {/* Manual Input - Keypad Icon */}
           <TouchableOpacity
             style={styles.navButton}
             onPress={openManualInput}
           >
-            <Ionicons name="lock-closed" size={24} color="white" />
+            <Ionicons name="keypad" size={24} color="white" />
           </TouchableOpacity>
 
           {/* Center Scanning Button */}
