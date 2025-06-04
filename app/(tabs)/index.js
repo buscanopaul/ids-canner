@@ -270,35 +270,35 @@ export default function App() {
       </CameraView>
       
       <View style={styles.buttonContainer}>
-        {!isScanning ? (
+        <View style={styles.bottomNavigation}>
+          {/* Manual Input - Lock Icon */}
           <TouchableOpacity
-            style={[styles.button, styles.startButton]}
-            onPress={startScanning}
+            style={styles.navButton}
+            onPress={openManualInput}
           >
-            <Text style={styles.buttonText}>Start Scanning</Text>
+            <Ionicons name="lock-closed" size={24} color="white" />
           </TouchableOpacity>
-        ) : (
+
+          {/* Center Scanning Button */}
           <TouchableOpacity
-            style={[styles.button, styles.stopButton]}
-            onPress={stopScanning}
+            style={[styles.centerButton, isScanning && styles.centerButtonActive]}
+            onPress={isScanning ? stopScanning : startScanning}
           >
-            <Text style={styles.buttonText}>Stop Scanning</Text>
+            <Ionicons 
+              name={isScanning ? "stop" : "scan"} 
+              size={28} 
+              color="white" 
+            />
           </TouchableOpacity>
-        )}
-        
-        <TouchableOpacity
-          style={[styles.button, styles.profileButton]}
-          onPress={navigateToProfile}
-        >
-          <Text style={styles.buttonText}>Profile</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.button, styles.manualInputButton]}
-          onPress={openManualInput}
-        >
-          <Text style={styles.buttonText}>Manual Input</Text>
-        </TouchableOpacity>
+
+          {/* Profile Button */}
+          <TouchableOpacity
+            style={styles.navButton}
+            onPress={navigateToProfile}
+          >
+            <Ionicons name="person" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Manual Input Modal */}
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.1)',
   },
   unfocusedContainer: {
     flex: 1,
@@ -419,29 +419,42 @@ const styles = StyleSheet.create({
     right: 20,
     alignItems: 'center',
   },
-  button: {
-    width: '80%',
-    padding: 15,
-    borderRadius: 10,
+  bottomNavigation: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 45,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
     alignItems: 'center',
-    marginVertical: 5,
+    justifyContent: 'space-around',
+    width: '100%',
+    maxWidth: 300,
   },
-  startButton: {
-    backgroundColor: '#28A745',
+  navButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  stopButton: {
+  centerButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#4F46E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#4F46E5',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 12,
+  },
+  centerButtonActive: {
     backgroundColor: '#DC3545',
-  },
-  profileButton: {
-    backgroundColor: '#6B73FF',
-  },
-  manualInputButton: {
-    backgroundColor: '#FF6B35',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   modalContainer: {
     flex: 1,
