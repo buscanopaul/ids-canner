@@ -113,7 +113,7 @@ export default function SignUpScreen() {
 
       if (createdSessionId) {
         await setActive({ session: createdSessionId });
-        router.replace('/(tabs)');
+        router.replace('/(auth)/subscription-selection');
       }
     } catch (err) {
       console.error('Google sign up error:', err);
@@ -130,7 +130,7 @@ export default function SignUpScreen() {
 
       if (createdSessionId) {
         await setActive({ session: createdSessionId });
-        router.replace('/(tabs)');
+        router.replace('/(auth)/subscription-selection');
       }
     } catch (err) {
       console.error('Apple sign up error:', err);

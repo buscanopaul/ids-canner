@@ -10,11 +10,15 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useUser } from '@clerk/clerk-expo';
+import SubscriptionService from '../services/subscriptionService';
 
 const { width } = Dimensions.get('window');
 
 const DatabaseLookupDisplay = ({ data, onClose, onScanAnother }) => {
   const [showFullData, setShowFullData] = useState(false);
+  const { user } = useUser();
+  const canViewPhotos = user ? SubscriptionService.canViewPhotos(user) : false;
 
   const getVerificationBadge = () => {
     switch (data.verificationStatus) {
@@ -75,7 +79,7 @@ const DatabaseLookupDisplay = ({ data, onClose, onScanAnother }) => {
 
           {/* Photo Section */}
           <View style={styles.photoSection}>
-            {(data.photo || data.photoUrl) ? (
+            {(data.photo || data.photoUrl) && canViewPhotos ? (
               <Image 
                 source={{ uri: data.photo || data.photoUrl }} 
                 style={styles.photoImage}
@@ -86,6 +90,18 @@ const DatabaseLookupDisplay = ({ data, onClose, onScanAnother }) => {
                   console.log('Image loaded successfully');
                 }}
               />
+            ) : !canViewPhotos && (data.photo || data.photoUrl) ? (
+              <View style={styles.photoUpgradeContainer}>
+                <View style={styles.photoPlaceholder}>
+                  <Ionicons name="lock-closed" size={60} color="#9CA3AF" />
+                  <Text style={styles.photoPlaceholderText}>
+                    Photo Available
+                  </Text>
+                  <Text style={styles.upgradeText}>
+                    Upgrade to Pro to view photos
+                  </Text>
+                </View>
+              </View>
             ) : (
               <View style={styles.photoPlaceholder}>
                 <Ionicons name="person" size={60} color="#9CA3AF" />
@@ -252,6 +268,16 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginTop: 8,
     textAlign: 'center',
+  },
+  photoUpgradeContainer: {
+    alignItems: 'center',
+  },
+  upgradeText: {
+    fontSize: 11,
+    color: '#3b82f6',
+    marginTop: 4,
+    textAlign: 'center',
+    fontWeight: '600',
   },
   section: {
     marginBottom: 24,

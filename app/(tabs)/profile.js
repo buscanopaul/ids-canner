@@ -13,7 +13,8 @@ import {
 import { useUser, useAuth } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import SubscriptionService, { SUBSCRIPTION_PLANS } from '../services/subscriptionService';
 
 const { width } = Dimensions.get('window');
 
@@ -21,11 +22,31 @@ export default function ProfileScreen() {
   const { user } = useUser();
   const { signOut } = useAuth();
   const router = useRouter();
+  const [subscription, setSubscription] = useState(null);
+  const [remainingScans, setRemainingScans] = useState(0);
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(width)).current; // Start off-screen to the right
   const fadeAnim = useRef(new Animated.Value(0)).current; // Start invisible
   const scaleAnim = useRef(new Animated.Value(0.9)).current; // Start slightly smaller
+
+  // Load subscription data
+  useEffect(() => {
+    if (user) {
+      const loadSubscriptionData = async () => {
+        try {
+          await SubscriptionService.initializeUserSubscription(user);
+          const userSubscription = SubscriptionService.getUserSubscription(user);
+          const { remainingScans: remaining } = SubscriptionService.canPerformScan(user);
+          setSubscription(userSubscription);
+          setRemainingScans(remaining);
+        } catch (error) {
+          console.error('Error loading subscription data:', error);
+        }
+      };
+      loadSubscriptionData();
+    }
+  }, [user]);
 
   // Entrance animation
   useEffect(() => {
@@ -138,6 +159,10 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleSubscriptionUpgrade = () => {
+    router.push('/(auth)/subscription-selection');
+  };
+
   const handleHelpSupport = () => {
     const email = 'appedgescanner@gmail.com';
     const subject = 'Help & Support Request';
@@ -244,6 +269,63 @@ export default function ProfileScreen() {
               <Text style={styles.userId}>ID: {user?.id?.slice(0, 8)}...</Text>
             </View>
           </View>
+
+          {/* Subscription Info */}
+          {subscription && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Subscription</Text>
+              
+              <View style={styles.subscriptionCard}>
+                <View style={styles.subscriptionHeader}>
+                  <View style={styles.subscriptionPlan}>
+                    <Text style={styles.planName}>
+                      {SubscriptionService.getPlanDetails(subscription.plan).name}
+                    </Text>
+                    <Text style={styles.planPrice}>
+                      {SubscriptionService.getPlanDetails(subscription.plan).price}
+                      {subscription.plan !== SUBSCRIPTION_PLANS.FREE && (
+                        <Text style={styles.planPeriod}>
+                          /{SubscriptionService.getPlanDetails(subscription.plan).period.replace('per ', '')}
+                        </Text>
+                      )}
+                    </Text>
+                  </View>
+                  {subscription.plan === SUBSCRIPTION_PLANS.FREE && (
+                    <TouchableOpacity 
+                      style={styles.upgradeButton}
+                      onPress={handleSubscriptionUpgrade}
+                    >
+                      <Text style={styles.upgradeButtonText}>Upgrade</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                
+                <View style={styles.subscriptionStats}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statValue}>
+                      {remainingScans === -1 ? '∞' : remainingScans}
+                    </Text>
+                    <Text style={styles.statLabel}>Scans Remaining</Text>
+                  </View>
+                  {subscription.plan === SUBSCRIPTION_PLANS.FREE && (
+                    <View style={styles.statItem}>
+                      <Text style={styles.statValue}>2</Text>
+                      <Text style={styles.statLabel}>Daily Limit</Text>
+                    </View>
+                  )}
+                </View>
+                
+                <View style={styles.subscriptionFeatures}>
+                  {SubscriptionService.getPlanDetails(subscription.plan).features.map((feature, index) => (
+                    <View key={index} style={styles.featureItem}>
+                      <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                      <Text style={styles.featureText}>{feature}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
 
           {/* Account Details */}
           <View style={styles.card}>
@@ -526,5 +608,76 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  subscriptionCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+  },
+  subscriptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  subscriptionPlan: {
+    flex: 1,
+  },
+  planName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  planPrice: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3b82f6',
+  },
+  planPeriod: {
+    fontSize: 14,
+    fontWeight: 'normal',
+    color: '#6b7280',
+  },
+  upgradeButton: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  upgradeButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  subscriptionStats: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    gap: 24,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  subscriptionFeatures: {
+    gap: 8,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  featureText: {
+    fontSize: 14,
+    color: '#374151',
   },
 });

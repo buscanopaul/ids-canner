@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, Alert, TouchableOpacity, Modal, TextInput, KeyboardAvoidingView, Platform, Image, Linking } from 'react-native';
 import { CameraView, Camera } from 'expo-camera';
 import { useRouter } from 'expo-router';
+import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import AppwriteService from '../services/appwriteService';
 import DatabaseLookupDisplay from '../components/DatabaseLookupDisplay';
+import SubscriptionLimitModal from '../components/SubscriptionLimitModal';
+import SubscriptionService from '../services/subscriptionService';
 import { parseIDData } from '../utils/idDataParser';
 
 export default function App() {
@@ -19,7 +22,10 @@ export default function App() {
   const [isProcessingQR, setIsProcessingQR] = useState(false);
   const [flashMode, setFlashMode] = useState('off');
   const [isCameraOn, setIsCameraOn] = useState(true);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [remainingScans, setRemainingScans] = useState(2);
   const router = useRouter();
+  const { user } = useUser();
 
   useEffect(() => {
     const getCameraPermissions = async () => {
@@ -46,8 +52,35 @@ export default function App() {
     setIsScanning(false);
   }, [showLookupResult]);
 
+  // Check subscription status and update remaining scans
+  useEffect(() => {
+    if (user) {
+      const checkSubscription = async () => {
+        try {
+          await SubscriptionService.initializeUserSubscription(user);
+          const { canScan, remainingScans: remaining } = SubscriptionService.canPerformScan(user);
+          setRemainingScans(remaining);
+        } catch (error) {
+          console.error('Error checking subscription:', error);
+        }
+      };
+      checkSubscription();
+    }
+  }, [user]);
+
   const handleBarCodeScanned = async ({ type, data }) => {
     if (scanned || isProcessingQR) return; // Prevent multiple scans
+    
+    // Check subscription limits before processing scan
+    if (user) {
+      const { canScan } = SubscriptionService.canPerformScan(user);
+      if (!canScan) {
+        setScanned(true);
+        setIsScanning(false);
+        setShowSubscriptionModal(true);
+        return;
+      }
+    }
     
     setScanned(true);
     setIsScanning(false); // Stop scanning immediately
@@ -55,8 +88,22 @@ export default function App() {
 
     try {
       console.log('QR Code scanned:', data);
+      
+      // Increment scan count
+      if (user) {
+        await SubscriptionService.incrementScanCount(user);
+        const { remainingScans: remaining } = SubscriptionService.canPerformScan(user);
+        setRemainingScans(remaining);
+      }
+      
       // Use the existing parseIDData function to process the scanned data
       const parsedData = await parseIDData(data, type);
+      
+      // Check if user can view photos
+      const canViewPhotos = user ? SubscriptionService.canViewPhotos(user) : false;
+      if (!canViewPhotos && parsedData.photo) {
+        delete parsedData.photo; // Remove photo for free users
+      }
       
       setLookupResult(parsedData);
       setIsProcessingQR(false);
@@ -89,6 +136,16 @@ export default function App() {
       Alert.alert('Turn On Camera', 'Please turn on the camera first before scanning');
       return;
     }
+    
+    // Check subscription limits before starting scan
+    if (user) {
+      const { canScan } = SubscriptionService.canPerformScan(user);
+      if (!canScan) {
+        setShowSubscriptionModal(true);
+        return;
+      }
+    }
+    
     setIsScanning(true);
     setScanned(false);
   };
@@ -104,6 +161,15 @@ export default function App() {
   };
 
   const openManualInput = () => {
+    // Check subscription limits before opening manual input
+    if (user) {
+      const { canScan } = SubscriptionService.canPerformScan(user);
+      if (!canScan) {
+        setShowSubscriptionModal(true);
+        return;
+      }
+    }
+    
     setIsScanning(false);
     setShowManualInput(true);
     setManualIdInput('');
@@ -120,6 +186,16 @@ export default function App() {
       return;
     }
 
+    // Check subscription limits before processing manual lookup
+    if (user) {
+      const { canScan } = SubscriptionService.canPerformScan(user);
+      if (!canScan) {
+        closeManualInput();
+        setShowSubscriptionModal(true);
+        return;
+      }
+    }
+
     setIsSearching(true);
 
     try {
@@ -127,6 +203,13 @@ export default function App() {
       const result = await AppwriteService.lookupIdByNumber(manualIdInput.trim());
       
       if (result.found) {
+        // Increment scan count for manual lookup
+        if (user) {
+          await SubscriptionService.incrementScanCount(user);
+          const { remainingScans: remaining } = SubscriptionService.canPerformScan(user);
+          setRemainingScans(remaining);
+        }
+        
         // Transform the database record to match the expected format
         const transformedData = {
           ...result.record,
@@ -137,6 +220,12 @@ export default function App() {
           recordId: result.record.$id,
           lastUpdated: result.record.$updatedAt
         };
+        
+        // Check if user can view photos
+        const canViewPhotos = user ? SubscriptionService.canViewPhotos(user) : false;
+        if (!canViewPhotos && transformedData.photo) {
+          delete transformedData.photo; // Remove photo for free users
+        }
         
         setLookupResult(transformedData);
         setIsSearching(false);
@@ -194,6 +283,27 @@ export default function App() {
     }
     const newFlashMode = flashMode === 'off' ? 'on' : 'off';
     setFlashMode(newFlashMode);
+  };
+
+  const handleSubscriptionUpgrade = async (planType) => {
+    try {
+      if (user) {
+        const success = await SubscriptionService.updateSubscriptionPlan(user, planType);
+        if (success) {
+          const { remainingScans: remaining } = SubscriptionService.canPerformScan(user);
+          setRemainingScans(remaining);
+          Alert.alert(
+            'Upgrade Successful!',
+            `You've been upgraded to ${SubscriptionService.getPlanDetails(planType).name}. You can now scan unlimited IDs!`
+          );
+        } else {
+          Alert.alert('Error', 'Failed to upgrade subscription. Please try again.');
+        }
+      }
+    } catch (error) {
+      console.error('Error upgrading subscription:', error);
+      Alert.alert('Error', 'Failed to upgrade subscription. Please try again.');
+    }
   };
 
   const handleLogoPress = () => {
@@ -259,6 +369,15 @@ export default function App() {
               />
             </TouchableOpacity>
 
+            {/* Scan Counter */}
+            {user && remainingScans >= 0 && (
+              <View style={styles.scanCounter}>
+                <Text style={styles.scanCounterText}>
+                  {remainingScans === -1 ? '∞' : remainingScans} scans left
+                </Text>
+              </View>
+            )}
+
             <View style={styles.rightControls}>
               <TouchableOpacity
                 style={styles.cameraButton}
@@ -318,6 +437,15 @@ export default function App() {
                 resizeMode="contain"
               />
             </TouchableOpacity>
+
+            {/* Scan Counter */}
+            {user && remainingScans >= 0 && (
+              <View style={styles.scanCounter}>
+                <Text style={styles.scanCounterText}>
+                  {remainingScans === -1 ? '∞' : remainingScans} scans left
+                </Text>
+              </View>
+            )}
 
             <View style={styles.rightControls}>
               <TouchableOpacity
@@ -467,6 +595,15 @@ export default function App() {
           onScanAnother={handleScanAnother}
         />
       )}
+
+      {/* Subscription Limit Modal */}
+      <SubscriptionLimitModal
+        visible={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+        onUpgrade={handleSubscriptionUpgrade}
+        remainingScans={remainingScans}
+        userPlan={user ? SubscriptionService.getUserSubscription(user).plan : 'free'}
+      />
     </View>
   );
 }
@@ -811,5 +948,18 @@ const styles = StyleSheet.create({
     borderRightWidth: 3,
     borderColor: '#fff',
     borderBottomRightRadius: 5,
+  },
+  scanCounter: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  scanCounterText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

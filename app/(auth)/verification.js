@@ -58,7 +58,7 @@ export default function VerificationScreen() {
 
       if (completeSignUp.status === 'complete') {
         await setActive({ session: completeSignUp.createdSessionId });
-        router.replace('/(tabs)');
+        router.replace('/(auth)/subscription-selection');
       }
     } catch (err) {
       console.error('Verification error:', err);

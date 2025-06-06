@@ -10,8 +10,9 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
-import { useSignIn, useOAuth } from '@clerk/clerk-expo';
+import { useSignIn, useOAuth, useUser } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
+import SubscriptionService from '../services/subscriptionService';
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
@@ -53,6 +54,17 @@ export default function SignInScreen() {
 
       if (signInAttempt.status === 'complete') {
         await setActive({ session: signInAttempt.createdSessionId });
+        // Initialize subscription metadata for existing users
+        setTimeout(async () => {
+          try {
+            const { user } = await import('@clerk/clerk-expo');
+            if (user) {
+              await SubscriptionService.initializeUserSubscription(user);
+            }
+          } catch (error) {
+            console.error('Error initializing subscription:', error);
+          }
+        }, 1000);
         router.replace('/(tabs)');
       } else {
         Alert.alert('Error', 'Sign in incomplete. Please try again.');
@@ -72,6 +84,18 @@ export default function SignInScreen() {
 
       if (createdSessionId) {
         await setActive({ session: createdSessionId });
+        // Initialize subscription metadata for OAuth users
+        setTimeout(async () => {
+          try {
+            const { useUser } = await import('@clerk/clerk-expo');
+            const { user } = useUser();
+            if (user) {
+              await SubscriptionService.initializeUserSubscription(user);
+            }
+          } catch (error) {
+            console.error('Error initializing subscription:', error);
+          }
+        }, 1000);
         router.replace('/(tabs)');
       }
     } catch (err) {
@@ -89,6 +113,18 @@ export default function SignInScreen() {
 
       if (createdSessionId) {
         await setActive({ session: createdSessionId });
+        // Initialize subscription metadata for OAuth users
+        setTimeout(async () => {
+          try {
+            const { useUser } = await import('@clerk/clerk-expo');
+            const { user } = useUser();
+            if (user) {
+              await SubscriptionService.initializeUserSubscription(user);
+            }
+          } catch (error) {
+            console.error('Error initializing subscription:', error);
+          }
+        }, 1000);
         router.replace('/(tabs)');
       }
     } catch (err) {
