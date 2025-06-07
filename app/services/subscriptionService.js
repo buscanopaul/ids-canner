@@ -27,19 +27,19 @@ export const PLAN_LIMITS = {
 export const PLAN_DETAILS = {
   [SUBSCRIPTION_PLANS.FREE]: {
     name: 'Free',
-    price: '$0',
+    price: '₱0',
     period: 'forever',
     features: ['2 daily scans', 'QR code scanning', 'Manual ID lookup']
   },
   [SUBSCRIPTION_PLANS.MONTHLY_PRO]: {
     name: 'Monthly Pro',
-    price: '$9.99',
+    price: '₱199',
     period: 'per month',
     features: ['Unlimited scans', 'Photo viewing', 'QR code scanning', 'Manual ID lookup', 'Priority support']
   },
   [SUBSCRIPTION_PLANS.YEARLY_PRO]: {
     name: 'Yearly Pro',
-    price: '$99.99',
+    price: '₱1,999',
     period: 'per year',
     features: ['Unlimited scans', 'Photo viewing', 'QR code scanning', 'Manual ID lookup', 'Priority support', '2 months free!']
   }
