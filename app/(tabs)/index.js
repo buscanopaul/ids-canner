@@ -6,7 +6,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import AppwriteService from '../services/appwriteService';
 import DatabaseLookupDisplay from '../components/DatabaseLookupDisplay';
-import SubscriptionLimitModal from '../components/SubscriptionLimitModal';
+
 import SubscriptionService from '../services/subscriptionService';
 import { parseIDData } from '../utils/idDataParser';
 
@@ -22,7 +22,7 @@ export default function App() {
   const [isProcessingQR, setIsProcessingQR] = useState(false);
   const [flashMode, setFlashMode] = useState('off');
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+
   const [remainingScans, setRemainingScans] = useState(2);
   const router = useRouter();
   const { user } = useUser();
@@ -77,7 +77,7 @@ export default function App() {
       if (!canScan) {
         setScanned(true);
         setIsScanning(false);
-        setShowSubscriptionModal(true);
+        handleSubscriptionUpgrade();
         return;
       }
     }
@@ -141,7 +141,7 @@ export default function App() {
     if (user) {
       const { canScan } = SubscriptionService.canPerformScan(user);
       if (!canScan) {
-        setShowSubscriptionModal(true);
+        handleSubscriptionUpgrade();
         return;
       }
     }
@@ -165,7 +165,7 @@ export default function App() {
     if (user) {
       const { canScan } = SubscriptionService.canPerformScan(user);
       if (!canScan) {
-        setShowSubscriptionModal(true);
+        handleSubscriptionUpgrade();
         return;
       }
     }
@@ -191,7 +191,7 @@ export default function App() {
       const { canScan } = SubscriptionService.canPerformScan(user);
       if (!canScan) {
         closeManualInput();
-        setShowSubscriptionModal(true);
+        handleSubscriptionUpgrade();
         return;
       }
     }
@@ -286,28 +286,19 @@ export default function App() {
   };
 
   const handleSubscriptionUpgrade = async (planType) => {
+    // Navigate to subscription selection screen instead of directly upgrading
+    // This ensures payment flow is followed for paid plans
+    console.log('Navigating to subscription selection...');
     try {
-      if (user) {
-        const success = await SubscriptionService.updateSubscriptionPlan(user, planType);
-        if (success) {
-          const { remainingScans: remaining } = SubscriptionService.canPerformScan(user);
-          setRemainingScans(remaining);
-          Alert.alert(
-            'Upgrade Successful!',
-            `You've been upgraded to ${SubscriptionService.getPlanDetails(planType).name}. You can now scan unlimited IDs!`
-          );
-        } else {
-          Alert.alert('Error', 'Failed to upgrade subscription. Please try again.');
-        }
-      }
+      router.push('/subscription-selection');
     } catch (error) {
-      console.error('Error upgrading subscription:', error);
-      Alert.alert('Error', 'Failed to upgrade subscription. Please try again.');
+      console.error('Navigation error:', error);
+      Alert.alert('Navigation Error', 'Unable to open subscription page. Please try again.');
     }
   };
 
   const handleLogoPress = () => {
-    const appId = 'your-app-id'; // Replace with your actual app ID
+    const appId = 'edge-scanner' // Replace with your actual app ID
     let storeUrl;
 
     if (Platform.OS === 'ios') {
@@ -596,14 +587,7 @@ export default function App() {
         />
       )}
 
-      {/* Subscription Limit Modal */}
-      <SubscriptionLimitModal
-        visible={showSubscriptionModal}
-        onClose={() => setShowSubscriptionModal(false)}
-        onUpgrade={handleSubscriptionUpgrade}
-        remainingScans={remainingScans}
-        userPlan={user ? SubscriptionService.getUserSubscription(user).plan : 'free'}
-      />
+
     </View>
   );
 }

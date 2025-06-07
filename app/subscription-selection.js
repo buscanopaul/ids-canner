@@ -7,14 +7,14 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useUser } from '@clerk/clerk-expo';
-import EnhancedSubscriptionSelector from '../components/EnhancedSubscriptionSelector';
-import SubscriptionService from '../services/subscriptionService';
+import EnhancedSubscriptionSelector from './components/EnhancedSubscriptionSelector';
+import SubscriptionService from './services/subscriptionService';
 
 export default function SubscriptionSelectionScreen() {
   const router = useRouter();
   const { user } = useUser();
   
-  console.log('SubscriptionSelectionScreen mounted', { user: !!user });
+  console.log('SubscriptionSelectionScreen mounted (root)', { user: !!user });
 
   const handleSubscriptionComplete = (planType) => {
     // Navigate to main app after subscription is complete
@@ -35,7 +35,7 @@ export default function SubscriptionSelectionScreen() {
   return (
     <View style={styles.container}>
       <Text style={{ padding: 20, fontSize: 18, textAlign: 'center' }}>
-        Subscription Selection Screen Loaded
+        Subscription Selection Screen (Root)
       </Text>
       <EnhancedSubscriptionSelector
         onSubscriptionComplete={handleSubscriptionComplete}

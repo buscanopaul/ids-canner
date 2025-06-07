@@ -160,7 +160,7 @@ export default function ProfileScreen() {
   };
 
   const handleSubscriptionUpgrade = () => {
-    router.push('/(auth)/subscription-selection');
+    router.push('/subscription-selection');
   };
 
   const handleHelpSupport = () => {

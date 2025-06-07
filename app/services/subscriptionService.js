@@ -1,4 +1,5 @@
 import { useUser } from '@clerk/clerk-expo';
+import PayMongoService from './paymongoService';
 
 export const SUBSCRIPTION_PLANS = {
   FREE: 'free',
@@ -195,6 +196,73 @@ class SubscriptionService {
   // Get plan limits
   static getPlanLimits(planType) {
     return PLAN_LIMITS[planType] || PLAN_LIMITS[SUBSCRIPTION_PLANS.FREE];
+  }
+
+  // Check subscription status with PayMongo integration
+  static isSubscriptionActive(user) {
+    return PayMongoService.isSubscriptionActive(user);
+  }
+
+  // Process subscription payment
+  static async processSubscriptionPayment(user, planType, paymentMethod, paymentDetails, redirectUrls = null) {
+    const planDetails = this.getPlanDetails(planType);
+    const amount = parseFloat(planDetails.price.replace('₱', '').replace(',', ''));
+    
+    if (amount === 0) {
+      // Free plan - just update the subscription
+      return await this.updateSubscriptionPlan(user, planType);
+    }
+
+    try {
+      let paymentResult;
+      
+      if (paymentMethod === 'card') {
+        paymentResult = await PayMongoService.processCardPayment(
+          amount,
+          paymentDetails,
+          `${planDetails.name} Subscription`
+        );
+        
+        // For card payments, return the result for client-side 3D Secure handling
+        return {
+          success: true,
+          paymentData: {
+            paymentIntentId: paymentResult.paymentIntent.id,
+            clientSecret: paymentResult.clientSecret,
+            amount: amount
+          },
+          requiresAction: true
+        };
+      } else if (paymentMethod === 'gcash') {
+        paymentResult = await PayMongoService.processGCashPayment(
+          amount,
+          redirectUrls,
+          `${planDetails.name} Subscription`
+        );
+        
+        return {
+          success: true,
+          paymentData: {
+            source: paymentResult.source,
+            sourceId: paymentResult.source.id,
+            checkoutUrl: paymentResult.checkoutUrl,
+            amount: amount
+          },
+          requiresRedirect: true
+        };
+      }
+    } catch (error) {
+      console.error('Error processing subscription payment:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Verify payment and complete subscription
+  static async verifyAndCompleteSubscription(user, paymentData, subscriptionPlan) {
+    return await PayMongoService.verifyPaymentAndUpdateSubscription(user, paymentData, subscriptionPlan);
   }
 }
 
