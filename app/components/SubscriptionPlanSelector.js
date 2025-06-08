@@ -30,7 +30,6 @@ const SubscriptionPlanSelector = ({ selectedPlan, onPlanSelect, onSkip }) => {
   const PlanCard = ({ planType, isSelected }) => {
     const plan = PLAN_DETAILS[planType];
     const isPopular = planType === SUBSCRIPTION_PLANS.YEARLY_PRO;
-    const isFree = planType === SUBSCRIPTION_PLANS.FREE;
 
     return (
       <TouchableOpacity
@@ -98,10 +97,6 @@ const SubscriptionPlanSelector = ({ selectedPlan, onPlanSelect, onSkip }) => {
 
         <View style={styles.plansContainer}>
           <PlanCard 
-            planType={SUBSCRIPTION_PLANS.FREE} 
-            isSelected={selectedPlan === SUBSCRIPTION_PLANS.FREE}
-          />
-          <PlanCard 
             planType={SUBSCRIPTION_PLANS.MONTHLY_PRO} 
             isSelected={selectedPlan === SUBSCRIPTION_PLANS.MONTHLY_PRO}
           />
@@ -121,7 +116,6 @@ const SubscriptionPlanSelector = ({ selectedPlan, onPlanSelect, onSkip }) => {
           </TouchableOpacity>
           
           <Text style={styles.footerNote}>
-            • No credit card required for free plan{'\n'}
             • Cancel anytime{'\n'}
             • 30-day money-back guarantee
           </Text>

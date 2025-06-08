@@ -24,30 +24,8 @@ const EnhancedSubscriptionSelector = ({ onSubscriptionComplete, onSkip }) => {
     
     setSelectedPlan(planType);
     
-    // If it's a free plan, directly complete subscription
-    if (planType === SUBSCRIPTION_PLANS.FREE) {
-      setLoading(true);
-      try {
-        const success = await SubscriptionService.updateSubscriptionPlan(user, planType);
-        if (success) {
-          Alert.alert(
-            'Free Plan Selected!',
-            'You\'ve successfully selected the free plan.',
-            [{ text: 'OK', onPress: () => onSubscriptionComplete?.(planType) }]
-          );
-        } else {
-          Alert.alert('Error', 'Failed to update subscription. Please try again.');
-        }
-      } catch (error) {
-        console.error('Error updating free plan:', error);
-        Alert.alert('Error', 'Something went wrong. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      // For paid plans, show payment modal - NO premature success message
-      setShowPaymentModal(true);
-    }
+    // For paid plans, show payment modal
+    setShowPaymentModal(true);
   };
 
   const handlePaymentComplete = () => {
@@ -58,8 +36,6 @@ const EnhancedSubscriptionSelector = ({ onSubscriptionComplete, onSkip }) => {
   const PlanCard = ({ planType, isSelected }) => {
     const plan = PLAN_DETAILS[planType];
     const isPopular = planType === SUBSCRIPTION_PLANS.YEARLY_PRO;
-    const isFree = planType === SUBSCRIPTION_PLANS.FREE;
-    const isPro = planType !== SUBSCRIPTION_PLANS.FREE;
 
     return (
       <TouchableOpacity
@@ -119,8 +95,7 @@ const EnhancedSubscriptionSelector = ({ onSubscriptionComplete, onSkip }) => {
             style={[
               styles.selectButton,
               isSelected && styles.selectedButton,
-              isFree && styles.freeButton,
-              isPro && !isSelected && styles.proButton
+              !isSelected && styles.proButton
             ]}
             onPress={() => handlePlanSelect(planType)}
             disabled={loading}
@@ -128,12 +103,11 @@ const EnhancedSubscriptionSelector = ({ onSubscriptionComplete, onSkip }) => {
             <Text style={[
               styles.selectButtonText,
               isSelected && styles.selectedButtonText,
-              isFree && styles.freeButtonText,
-              isPro && !isSelected && styles.proButtonText
+              !isSelected && styles.proButtonText
             ]}>
-              {isFree ? 'Get Started Free' : isSelected ? 'Selected' : 'Upgrade Now'}
+              {isSelected ? 'Selected' : 'Upgrade Now'}
             </Text>
-            {isPro && !isSelected && (
+            {!isSelected && (
               <Ionicons name="arrow-forward" size={16} color="#fff" />
             )}
           </TouchableOpacity>
@@ -159,10 +133,6 @@ const EnhancedSubscriptionSelector = ({ onSubscriptionComplete, onSkip }) => {
         </View>
 
         <View style={styles.plansContainer}>
-          <PlanCard 
-            planType={SUBSCRIPTION_PLANS.FREE} 
-            isSelected={selectedPlan === SUBSCRIPTION_PLANS.FREE}
-          />
           <PlanCard 
             planType={SUBSCRIPTION_PLANS.MONTHLY_PRO} 
             isSelected={selectedPlan === SUBSCRIPTION_PLANS.MONTHLY_PRO}
@@ -197,7 +167,6 @@ const EnhancedSubscriptionSelector = ({ onSubscriptionComplete, onSkip }) => {
           </TouchableOpacity>
           
           <Text style={styles.footerNote}>
-            • No credit card required for free plan{'\n'}
             • Secure payments powered by PayMongo{'\n'}
             • Cancel anytime • 30-day money-back guarantee
           </Text>
@@ -337,11 +306,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     gap: 8,
   },
-  freeButton: {
-    backgroundColor: '#f3f4f6',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-  },
   proButton: {
     backgroundColor: '#3b82f6',
   },
@@ -353,9 +317,6 @@ const styles = StyleSheet.create({
   selectButtonText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  freeButtonText: {
-    color: '#374151',
   },
   proButtonText: {
     color: '#fff',
