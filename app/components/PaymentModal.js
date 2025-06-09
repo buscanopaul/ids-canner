@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -27,42 +27,100 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
     expMonth: '',
     expYear: '',
     cvc: '',
-    name: ''
+    name: '',
+    email: user?.emailAddresses?.[0]?.emailAddress || ''
   });
 
-  const handleCardInputChange = (field, value) => {
+  // Separate state for formatted display values
+  const [displayValues, setDisplayValues] = useState({
+    number: '',
+  });
+
+  const handleCardInputChange = useCallback((field, value) => {
     setCardForm(prev => ({
       ...prev,
       [field]: value
     }));
-  };
+  }, []);
+
+  const handleCardNumberChange = useCallback((value) => {
+    // Remove all non-digits and limit to 19 digits
+    const cleanValue = value.replace(/\D/g, '').slice(0, 19);
+    
+    // Format for display (add spaces every 4 digits)
+    const formattedValue = cleanValue.replace(/(.{4})/g, '$1 ').trim();
+    
+    // Update both states
+    setDisplayValues(prev => ({ ...prev, number: formattedValue }));
+    setCardForm(prev => ({
+      ...prev,
+      number: cleanValue
+    }));
+  }, []);
+
+  const handleNameChange = useCallback((value) => {
+    setCardForm(prev => ({
+      ...prev,
+      name: value
+    }));
+  }, []);
+
+  const handleExpMonthChange = useCallback((value) => {
+    const cleanValue = value.replace(/\D/g, '').slice(0, 2);
+    
+    // Validate month range (1-12)
+    if (cleanValue.length === 2) {
+      const monthNum = parseInt(cleanValue);
+      if (monthNum < 1 || monthNum > 12) {
+        return; // Don't update if invalid month
+      }
+    } else if (cleanValue.length === 1) {
+      const monthNum = parseInt(cleanValue);
+      if (monthNum > 1) {
+        // If first digit is > 1, auto-pad with 0 (e.g., 2 becomes 02)
+        const paddedValue = `0${cleanValue}`;
+        setCardForm(prev => ({
+          ...prev,
+          expMonth: paddedValue
+        }));
+        return;
+      }
+    }
+    
+    setCardForm(prev => ({
+      ...prev,
+      expMonth: cleanValue
+    }));
+  }, []);
+
+  const handleExpYearChange = useCallback((value) => {
+    const cleanValue = value.replace(/\D/g, '').slice(0, 4);
+    setCardForm(prev => ({
+      ...prev,
+      expYear: cleanValue
+    }));
+  }, []);
+
+  const handleCvcChange = useCallback((value) => {
+    const cleanValue = value.replace(/\D/g, '').slice(0, 4);
+    setCardForm(prev => ({
+      ...prev,
+      cvc: cleanValue
+    }));
+  }, []);
+
+  const handleEmailChange = useCallback((value) => {
+    setCardForm(prev => ({
+      ...prev,
+      email: value
+    }));
+  }, []);
 
   const validateCardForm = () => {
-    const { number, expMonth, expYear, cvc, name } = cardForm;
+    const validation = PayMongoService.validateCardDetails(cardForm);
     
-    if (!name.trim()) {
-      Alert.alert('Error', 'Please enter cardholder name');
-      return false;
-    }
-    
-    if (!number || number.length < 13) {
-      Alert.alert('Error', 'Please enter a valid card number');
-      return false;
-    }
-    
-    if (!expMonth || expMonth.length < 1 || parseInt(expMonth) < 1 || parseInt(expMonth) > 12) {
-      Alert.alert('Error', 'Please enter a valid expiry month (01-12)');
-      return false;
-    }
-    
-    const currentYear = new Date().getFullYear();
-    if (!expYear || parseInt(expYear) < currentYear || parseInt(expYear) > currentYear + 20) {
-      Alert.alert('Error', 'Please enter a valid expiry year');
-      return false;
-    }
-    
-    if (!cvc || cvc.length < 3) {
-      Alert.alert('Error', 'Please enter a valid CVC');
+    if (!validation.isValid) {
+      Alert.alert('Invalid Card Information', validation.errors.join('\n'));
       return false;
     }
     
@@ -78,80 +136,98 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
       let paymentResult;
       
       if (paymentMethod === 'card') {
-        // Card payment will be handled by PayMongo's hosted payment page
-        Alert.alert(
-          'Card Payment',
-          'Card payments will be processed through PayMongo\'s secure payment system.',
-          [{ text: 'OK' }]
+        // Validate card form first
+        if (!validateCardForm()) {
+          setLoading(false);
+          return;
+        }
+
+        // Process card payment with PayMongo
+        const planAmount = parseFloat(planDetails?.price.replace('₱', '').replace(',', ''));
+        paymentResult = await PayMongoService.processCardPayment(
+          planAmount,
+          cardForm,
+          `${planDetails?.name} Subscription`
         );
-        setLoading(false);
-        return;
         
-                 if (paymentResult.success && paymentResult.requiresAction) {
-           // Process the actual PayMongo payment
-           Alert.alert(
-             'Complete Payment',
-             'Please complete the payment authentication to proceed.',
-             [
-               {
-                 text: 'Complete',
-                 onPress: async () => {
-                   try {
-                     // In a real implementation, you'd handle 3D Secure here
-                     // For now, we'll proceed to verify the payment with PayMongo
-                     const verificationResult = await SubscriptionService.verifyAndCompleteSubscription(
-                       user,
-                       paymentResult.paymentData,
-                       selectedPlan
-                     );
-                     
-                     if (verificationResult.success) {
-                       Alert.alert(
-                         'Payment Successful!',
-                         'Your subscription has been activated.',
-                         [{ 
-                           text: 'OK', 
-                           onPress: () => {
-                             onClose();
-                             onPaymentComplete?.();
-                           }
-                         }]
-                       );
-                     } else {
-                       Alert.alert('Payment Failed', verificationResult.message || 'Please try again.');
-                     }
-                   } catch (error) {
-                     Alert.alert('Payment Error', 'Failed to process payment. Please try again.');
-                   }
-                 }
-               },
-               { text: 'Cancel' }
-             ]
-           );
-         } else if (paymentResult.success) {
-           // Direct success without 3D Secure
-           const verificationResult = await SubscriptionService.verifyAndCompleteSubscription(
-             user,
-             paymentResult.paymentData,
-             selectedPlan
-           );
-           
-           if (verificationResult.success) {
-             Alert.alert(
-               'Payment Successful!',
-               'Your subscription has been activated.',
-               [{ 
-                 text: 'OK', 
-                 onPress: () => {
-                   onClose();
-                   onPaymentComplete?.();
-                 }
-               }]
-             );
-           } else {
-             Alert.alert('Payment Failed', verificationResult.message || 'Please try again.');
-           }
-         }
+        if (!paymentResult.success) {
+          let errorMessage = paymentResult.error || 'Failed to process card payment';
+          
+          // Check if it's a network/API key issue
+          if (errorMessage.includes('Network request failed')) {
+            errorMessage = 'PayMongo API connection failed. Please check your internet connection and API keys.';
+          }
+          
+          Alert.alert('Payment Error', errorMessage);
+          setLoading(false);
+          return;
+        }
+        
+        if (paymentResult.requiresAction) {
+          // Handle 3D Secure authentication
+          Alert.alert(
+            'Complete Payment',
+            'Please complete the payment authentication to proceed.',
+            [
+              {
+                text: 'Complete',
+                onPress: async () => {
+                  try {
+                    // In a real implementation, you'd handle 3D Secure here
+                    // For now, we'll proceed to verify the payment with PayMongo
+                    const verificationResult = await SubscriptionService.verifyAndCompleteSubscription(
+                      user,
+                      { paymentIntentId: paymentResult.paymentIntent.id },
+                      selectedPlan
+                    );
+                    
+                    if (verificationResult.success) {
+                      Alert.alert(
+                        'Payment Successful!',
+                        'Your subscription has been activated.',
+                        [{ 
+                          text: 'OK', 
+                          onPress: () => {
+                            onClose();
+                            onPaymentComplete?.();
+                          }
+                        }]
+                      );
+                    } else {
+                      Alert.alert('Payment Failed', verificationResult.message || 'Please try again.');
+                    }
+                  } catch (error) {
+                    Alert.alert('Payment Error', 'Failed to process payment. Please try again.');
+                  }
+                }
+              },
+              { text: 'Cancel' }
+            ]
+          );
+        } else {
+          // Direct success without 3D Secure
+          const verificationResult = await SubscriptionService.verifyAndCompleteSubscription(
+            user,
+            { paymentIntentId: paymentResult.paymentIntent.id },
+            selectedPlan
+          );
+          
+          if (verificationResult.success) {
+            Alert.alert(
+              'Payment Successful!',
+              'Your subscription has been activated.',
+              [{ 
+                text: 'OK', 
+                onPress: () => {
+                  onClose();
+                  onPaymentComplete?.();
+                }
+              }]
+            );
+          } else {
+            Alert.alert('Payment Failed', verificationResult.message || 'Please try again.');
+          }
+        }
               } else if (paymentMethod === 'gcash') {
           const redirectUrls = {
             success: 'https://payment-redirects-edge-scanner.vercel.app/success',
@@ -284,14 +360,107 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
     </View>
   );
 
-  const CardForm = () => (
+  const CardForm = useMemo(() => (
     <View style={styles.cardFormContainer}>
       <Text style={styles.sectionTitle}>Card Information</Text>
+      
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Cardholder Name</Text>
+        <TextInput
+          key="cardholder-name"
+          style={styles.textInput}
+          value={cardForm.name}
+          onChangeText={handleNameChange}
+          placeholder="Enter cardholder name"
+          autoCapitalize="words"
+          autoCorrect={false}
+          blurOnSubmit={false}
+        />
+      </View>
+      
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Email Address</Text>
+        <TextInput
+          key="email"
+          style={styles.textInput}
+          value={cardForm.email}
+          onChangeText={handleEmailChange}
+          placeholder="Enter email address"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          blurOnSubmit={false}
+        />
+      </View>
+      
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Card Number</Text>
+        <TextInput
+          key="card-number"
+          style={styles.textInput}
+          value={displayValues.number}
+          onChangeText={handleCardNumberChange}
+          placeholder="1234 5678 9012 3456"
+          keyboardType="numeric"
+          maxLength={23} // 19 digits + 4 spaces
+          autoCorrect={false}
+          blurOnSubmit={false}
+        />
+      </View>
+      
+      <View style={styles.row}>
+        <View style={[styles.inputContainer, styles.halfInput]}>
+          <Text style={styles.inputLabel}>Expiry Month</Text>
+          <TextInput
+            key="exp-month"
+            style={styles.textInput}
+            value={cardForm.expMonth}
+            onChangeText={handleExpMonthChange}
+            placeholder="MM"
+            keyboardType="numeric"
+            maxLength={2}
+            autoCorrect={false}
+            blurOnSubmit={false}
+          />
+        </View>
+        
+        <View style={[styles.inputContainer, styles.halfInput]}>
+          <Text style={styles.inputLabel}>Expiry Year</Text>
+          <TextInput
+            key="exp-year"
+            style={styles.textInput}
+            value={cardForm.expYear}
+            onChangeText={handleExpYearChange}
+            placeholder="YYYY"
+            keyboardType="numeric"
+            maxLength={4}
+            autoCorrect={false}
+            blurOnSubmit={false}
+          />
+        </View>
+        
+        <View style={[styles.inputContainer, styles.halfInput]}>
+          <Text style={styles.inputLabel}>CVC</Text>
+          <TextInput
+            key="cvc"
+            style={styles.textInput}
+            value={cardForm.cvc}
+            onChangeText={handleCvcChange}
+            placeholder="123"
+            keyboardType="numeric"
+            maxLength={4}
+            secureTextEntry={true}
+            autoCorrect={false}
+            blurOnSubmit={false}
+          />
+        </View>
+      </View>
+      
       <Text style={styles.cardInfoText}>
-        Card payment processing will be handled by PayMongo's secure payment system.
+        Your card information is encrypted and secure via PayMongo.
       </Text>
     </View>
-  );
+  ), [cardForm.name, cardForm.email, displayValues.number, cardForm.expMonth, cardForm.expYear, cardForm.cvc, handleNameChange, handleEmailChange, handleCardNumberChange, handleExpMonthChange, handleExpYearChange, handleCvcChange]);
 
   const GCashInfo = () => (
     <View style={styles.gcashInfoContainer}>
@@ -327,7 +496,7 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
           
           <PaymentMethodSelector />
           
-          {paymentMethod === 'card' ? <CardForm /> : <GCashInfo />}
+          {paymentMethod === 'card' ? CardForm : <GCashInfo />}
           
           <View style={styles.securityInfo}>
             <Ionicons name="shield-checkmark" size={20} color="#10b981" />

@@ -91,9 +91,13 @@ class SubscriptionService {
 
   // Update user's subscription plan
   static async updateSubscriptionPlan(user, newPlan) {
-    if (!user) return false;
+    if (!user) {
+      console.error('updateSubscriptionPlan: No user provided');
+      return false;
+    }
 
     try {
+      console.log('Updating subscription plan to:', newPlan);
       const currentMetadata = user.unsafeMetadata || {};
       const currentSubscription = currentMetadata.subscription || {};
 
@@ -112,6 +116,7 @@ class SubscriptionService {
         }
       });
       
+      console.log('Subscription plan updated successfully to:', newPlan);
       return true;
     } catch (error) {
       console.error('Error updating subscription plan:', error);
