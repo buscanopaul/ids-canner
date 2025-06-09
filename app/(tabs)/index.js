@@ -362,11 +362,23 @@ export default function App() {
 
             {/* Scan Counter */}
             {user && remainingScans >= 0 && (
-              <View style={styles.scanCounter}>
+              <TouchableOpacity 
+                style={styles.scanCounter}
+                onPress={handleSubscriptionUpgrade}
+                activeOpacity={0.7}
+              >
                 <Text style={styles.scanCounterText}>
                   {remainingScans === -1 ? '∞' : remainingScans} scans left
                 </Text>
-              </View>
+                {remainingScans !== -1 && (
+                  <Ionicons 
+                    name="chevron-forward" 
+                    size={14} 
+                    color="rgba(255, 255, 255, 0.8)" 
+                    style={styles.scanCounterIcon}
+                  />
+                )}
+              </TouchableOpacity>
             )}
 
             <View style={styles.rightControls}>
@@ -431,11 +443,23 @@ export default function App() {
 
             {/* Scan Counter */}
             {user && remainingScans >= 0 && (
-              <View style={styles.scanCounter}>
+              <TouchableOpacity 
+                style={styles.scanCounter}
+                onPress={handleSubscriptionUpgrade}
+                activeOpacity={0.7}
+              >
                 <Text style={styles.scanCounterText}>
                   {remainingScans === -1 ? '∞' : remainingScans} scans left
                 </Text>
-              </View>
+                {remainingScans !== -1 && (
+                  <Ionicons 
+                    name="chevron-forward" 
+                    size={14} 
+                    color="rgba(255, 255, 255, 0.8)" 
+                    style={styles.scanCounterIcon}
+                  />
+                )}
+              </TouchableOpacity>
             )}
 
             <View style={styles.rightControls}>
@@ -940,10 +964,16 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   scanCounterText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  scanCounterIcon: {
+    marginLeft: 2,
   },
 });
