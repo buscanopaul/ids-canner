@@ -9,7 +9,8 @@ import {
   ScrollView,
   Alert,
   Linking,
-  ActivityIndicator
+  ActivityIndicator,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '@clerk/clerk-expo';
@@ -347,7 +348,11 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
         onPress={() => setPaymentMethod('gcash')}
       >
         <View style={styles.paymentMethodInfo}>
-          <Ionicons name="phone-portrait" size={24} color="#00D4FF" />
+          <Image 
+            source={require('../../assets/logo-gcash.png')} 
+            style={styles.gcashLogo}
+            resizeMode="contain"
+          />
           <Text style={styles.paymentMethodText}>GCash</Text>
         </View>
         <View style={[
@@ -721,6 +726,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  gcashLogo: {
+    width: 24,
+    height: 24,
   },
 });
 
