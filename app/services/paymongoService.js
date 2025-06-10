@@ -29,11 +29,7 @@ class PayMongoService {
     try {
       const { number, expMonth, expYear, cvc, name, email } = cardDetails;
       
-      console.log('Creating payment method with PayMongo...');
-      console.log('API Keys present:', {
-        secretKey: !!PAYMONGO_SECRET_KEY,
-        publicKey: !!PAYMONGO_PUBLIC_KEY
-      });
+
       
       const response = await fetch(`${PAYMONGO_BASE_URL}/payment_methods`, {
         method: 'POST',
@@ -306,7 +302,6 @@ class PayMongoService {
 
   // Create Maya Payment Intent - Maya uses Payment Intent workflow
   static async processMayaPayment(amount, description) {
-    console.log('processMayaPayment called with:', { amount, description });
     try {
       const response = await fetch(`${PAYMONGO_BASE_URL}/payment_intents`, {
         method: 'POST',

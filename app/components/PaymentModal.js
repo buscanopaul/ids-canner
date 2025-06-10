@@ -17,6 +17,8 @@ import { useUser } from '@clerk/clerk-expo';
 import SubscriptionService from '../services/subscriptionService';
 import PayMongoService from '../services/paymongoService';
 
+const RETURN_URL = process.env.EXPO_PUBLIC_RETURN_URL;
+
 const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentComplete }) => {
   const { user } = useUser();
   const [paymentMethod, setPaymentMethod] = useState('card'); // 'card', 'gcash', or 'maya'
@@ -175,15 +177,12 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
 
         // Process card payment with PayMongo
         const planAmount = parseFloat(planDetails?.price.replace('₱', '').replace(',', ''));
-        console.log('Processing card payment with amount:', planAmount);
         
         paymentResult = await PayMongoService.processCardPayment(
           planAmount,
           cardForm,
           `${planDetails?.name} Subscription`
         );
-        
-        console.log('Card payment result:', paymentResult);
         
         if (!paymentResult || !paymentResult.success) {
           let errorMessage = 'Failed to process card payment';
@@ -272,11 +271,9 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
         }
               } else if (paymentMethod === 'gcash') {
           const redirectUrls = {
-            success: 'https://payment-redirects-edge-scanner.vercel.app/success',
-            failed: 'https://payment-redirects-edge-scanner.vercel.app/failed',
+            success: `${RETURN_URL}/success`,
+            failed: `${RETURN_URL}/failed`,
           };
-        
-        console.log('Processing GCash payment...');
         
         paymentResult = await SubscriptionService.processSubscriptionPayment(
           user,
@@ -285,8 +282,6 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
           null,
           redirectUrls
         );
-        
-        console.log('GCash payment result:', paymentResult);
         
         if (paymentResult && paymentResult.success && paymentResult.requiresRedirect) {
           Alert.alert(
@@ -360,12 +355,10 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
         }
       } else if (paymentMethod === 'maya') {
         const redirectUrls = {
-          success: 'https://payment-redirects-edge-scanner.vercel.app/success',
-          failed: 'https://payment-redirects-edge-scanner.vercel.app/failed',
+          success: `${RETURN_URL}/success`,
+          failed: `${RETURN_URL}/failed`,
         };
       
-        console.log('Processing Maya payment...');
-        
         paymentResult = await SubscriptionService.processSubscriptionPayment(
           user,
           selectedPlan,
@@ -373,8 +366,6 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
           null,
           redirectUrls
         );
-        
-        console.log('Maya payment result:', paymentResult);
         
         if (paymentResult && paymentResult.success && paymentResult.requiresAction) {
           // Maya uses Payment Intent workflow, handle differently than GCash
@@ -387,7 +378,7 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
                 onPress: async () => {
                   try {
                     // Create Maya payment method and attach to payment intent
-                    const returnUrl = 'https://payment-redirects-edge-scanner.vercel.app/success';
+                    const returnUrl = `${RETURN_URL}/success`;
                     const paymentMethodResult = await PayMongoService.createMayaPaymentMethod(
                       paymentResult.paymentData.clientSecret,
                       returnUrl
