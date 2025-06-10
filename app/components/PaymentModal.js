@@ -21,6 +21,7 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
   const { user } = useUser();
   const [paymentMethod, setPaymentMethod] = useState('card'); // 'card' or 'gcash'
   const [loading, setLoading] = useState(false);
+  const [cardType, setCardType] = useState(null); // 'visa', 'mastercard', or null
   
   // Card form state
   const [cardForm, setCardForm] = useState({
@@ -44,9 +45,38 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
     }));
   }, []);
 
+  const detectCardType = useCallback((cardNumber) => {
+    const cleanNumber = cardNumber.replace(/\D/g, '');
+    
+    if (cleanNumber.length >= 1) {
+      // Visa cards start with 4
+      if (cleanNumber[0] === '4') {
+        return 'visa';
+      }
+      
+      // Mastercard cards start with 5 or 2 (new range 2221-2720)
+      if (cleanNumber[0] === '5') {
+        return 'mastercard';
+      }
+      
+      if (cleanNumber[0] === '2' && cleanNumber.length >= 4) {
+        const firstFour = parseInt(cleanNumber.substring(0, 4));
+        if (firstFour >= 2221 && firstFour <= 2720) {
+          return 'mastercard';
+        }
+      }
+    }
+    
+    return null;
+  }, []);
+
   const handleCardNumberChange = useCallback((value) => {
     // Remove all non-digits and limit to 19 digits
     const cleanValue = value.replace(/\D/g, '').slice(0, 19);
+    
+    // Detect card type
+    const detectedCardType = detectCardType(cleanValue);
+    setCardType(detectedCardType);
     
     // Format for display (add spaces every 4 digits)
     const formattedValue = cleanValue.replace(/(.{4})/g, '$1 ').trim();
@@ -57,7 +87,7 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
       ...prev,
       number: cleanValue
     }));
-  }, []);
+  }, [detectCardType]);
 
   const handleNameChange = useCallback((value) => {
     setCardForm(prev => ({
@@ -400,17 +430,31 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
       
       <View style={styles.inputContainer}>
         <Text style={styles.inputLabel}>Card Number</Text>
-        <TextInput
-          key="card-number"
-          style={styles.textInput}
-          value={displayValues.number}
-          onChangeText={handleCardNumberChange}
-          placeholder="1234 5678 9012 3456"
-          keyboardType="numeric"
-          maxLength={23} // 19 digits + 4 spaces
-          autoCorrect={false}
-          blurOnSubmit={false}
-        />
+        <View style={styles.cardNumberContainer}>
+          <TextInput
+            key="card-number"
+            style={[styles.textInput, styles.cardNumberInput]}
+            value={displayValues.number}
+            onChangeText={handleCardNumberChange}
+            placeholder="1234 5678 9012 3456"
+            keyboardType="numeric"
+            maxLength={23} // 19 digits + 4 spaces
+            autoCorrect={false}
+            blurOnSubmit={false}
+          />
+          {cardType && (
+            <View style={styles.cardTypeContainer}>
+              <Image 
+                source={cardType === 'visa' 
+                  ? require('../../assets/visa-logo.png') 
+                  : require('../../assets/mastercard-logo.png')
+                } 
+                style={styles.cardTypeLogo}
+                resizeMode="contain"
+              />
+            </View>
+          )}
+        </View>
       </View>
       
       <View style={styles.row}>
@@ -730,6 +774,23 @@ const styles = StyleSheet.create({
   gcashLogo: {
     width: 24,
     height: 24,
+  },
+  cardNumberContainer: {
+    position: 'relative',
+  },
+  cardNumberInput: {
+    paddingRight: 50, // Make space for the card type logo
+  },
+  cardTypeContainer: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardTypeLogo: {
+    width: 32,
+    height: 20,
   },
 });
 
