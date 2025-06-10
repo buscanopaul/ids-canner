@@ -6,12 +6,21 @@ const PAYMONGO_SECRET_KEY = process.env.EXPO_PUBLIC_PAYMONGO_SECRET_KEY;
 const PAYMONGO_PUBLIC_KEY = process.env.EXPO_PUBLIC_PAYMONGO_PUBLIC_KEY;
 
 class PayMongoService {
-  // Helper method to create authorization header
+  // Helper method to create authorization header with secret key
   static getAuthHeader() {
     if (!PAYMONGO_SECRET_KEY) {
       throw new Error('PayMongo secret key not found. Please check your environment variables.');
     }
     const encoded = encode(`${PAYMONGO_SECRET_KEY}:`);
+    return `Basic ${encoded}`;
+  }
+
+  // Helper method to create authorization header with public key
+  static getPublicAuthHeader() {
+    if (!PAYMONGO_PUBLIC_KEY) {
+      throw new Error('PayMongo public key not found. Please check your environment variables.');
+    }
+    const encoded = encode(`${PAYMONGO_PUBLIC_KEY}:`);
     return `Basic ${encoded}`;
   }
 
@@ -292,6 +301,117 @@ class PayMongoService {
     } catch (error) {
       console.error('PayMongo completeGCashPayment error:', error);
       throw error;
+    }
+  }
+
+  // Create Maya Payment Intent - Maya uses Payment Intent workflow
+  static async processMayaPayment(amount, description) {
+    console.log('processMayaPayment called with:', { amount, description });
+    try {
+      const response = await fetch(`${PAYMONGO_BASE_URL}/payment_intents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': this.getAuthHeader(),
+        },
+        body: JSON.stringify({
+          data: {
+            type: 'payment_intent',
+            attributes: {
+              amount: Math.round(amount * 100), // Convert to centavos
+              payment_method_allowed: ['paymaya'], // Maya payment method (API still uses 'paymaya')
+              currency: 'PHP',
+              description: description,
+              capture_type: 'automatic',
+            },
+          },
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.errors?.[0]?.detail || 'Failed to create Maya Payment Intent');
+      }
+
+      return {
+        success: true,
+        paymentIntent: data.data,
+        clientSecret: data.data.attributes.client_key,
+      };
+    } catch (error) {
+      console.error('PayMongo processMayaPayment error:', error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  // Create Maya Payment Method and attach to Payment Intent
+  static async createMayaPaymentMethod(clientKey, returnUrl) {
+    try {
+      // Step 1: Create Maya payment method
+      const paymentMethodResponse = await fetch(`${PAYMONGO_BASE_URL}/payment_methods`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': this.getPublicAuthHeader(), // Use public key for payment methods
+        },
+        body: JSON.stringify({
+          data: {
+            type: 'payment_method',
+            attributes: {
+              type: 'paymaya', // API still uses 'paymaya' for Maya
+            },
+          },
+        }),
+      });
+
+      const paymentMethodData = await paymentMethodResponse.json();
+      
+      if (!paymentMethodResponse.ok) {
+        throw new Error(paymentMethodData.errors?.[0]?.detail || 'Failed to create Maya payment method');
+      }
+
+      // Step 2: Attach payment method to payment intent
+      const paymentIntentId = clientKey.split('_client')[0];
+      
+      const attachResponse = await fetch(`${PAYMONGO_BASE_URL}/payment_intents/${paymentIntentId}/attach`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': this.getPublicAuthHeader(), // Use public key for attach
+        },
+        body: JSON.stringify({
+          data: {
+            attributes: {
+              client_key: clientKey,
+              payment_method: paymentMethodData.data.id,
+              return_url: returnUrl,
+            },
+          },
+        }),
+      });
+
+      const attachData = await attachResponse.json();
+      
+      if (!attachResponse.ok) {
+        throw new Error(attachData.errors?.[0]?.detail || 'Failed to attach Maya payment method');
+      }
+
+      return {
+        success: true,
+        paymentIntent: attachData.data,
+        status: attachData.data.attributes.status,
+        nextAction: attachData.data.attributes.next_action,
+      };
+    } catch (error) {
+      console.error('PayMongo createMayaPaymentMethod error:', error);
+      return {
+        success: false,
+        error: error.message,
+      };
     }
   }
 

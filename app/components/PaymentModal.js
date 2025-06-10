@@ -19,7 +19,7 @@ import PayMongoService from '../services/paymongoService';
 
 const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentComplete }) => {
   const { user } = useUser();
-  const [paymentMethod, setPaymentMethod] = useState('card'); // 'card' or 'gcash'
+  const [paymentMethod, setPaymentMethod] = useState('card'); // 'card', 'gcash', or 'maya'
   const [loading, setLoading] = useState(false);
   const [cardType, setCardType] = useState(null); // 'visa', 'mastercard', or null
   
@@ -175,20 +175,31 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
 
         // Process card payment with PayMongo
         const planAmount = parseFloat(planDetails?.price.replace('₱', '').replace(',', ''));
+        console.log('Processing card payment with amount:', planAmount);
+        
         paymentResult = await PayMongoService.processCardPayment(
           planAmount,
           cardForm,
           `${planDetails?.name} Subscription`
         );
         
-        if (!paymentResult.success) {
-          let errorMessage = paymentResult.error || 'Failed to process card payment';
+        console.log('Card payment result:', paymentResult);
+        
+        if (!paymentResult || !paymentResult.success) {
+          let errorMessage = 'Failed to process card payment';
+          
+          if (paymentResult && paymentResult.error) {
+            errorMessage = paymentResult.error;
+          } else if (!paymentResult) {
+            errorMessage = 'Payment service returned no response. Please try again.';
+          }
           
           // Check if it's a network/API key issue
           if (errorMessage.includes('Network request failed')) {
             errorMessage = 'PayMongo API connection failed. Please check your internet connection and API keys.';
           }
           
+          console.error('Card payment error:', errorMessage);
           Alert.alert('Payment Error', errorMessage);
           setLoading(false);
           return;
@@ -265,6 +276,8 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
             failed: 'https://payment-redirects-edge-scanner.vercel.app/failed',
           };
         
+        console.log('Processing GCash payment...');
+        
         paymentResult = await SubscriptionService.processSubscriptionPayment(
           user,
           selectedPlan,
@@ -273,7 +286,9 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
           redirectUrls
         );
         
-        if (paymentResult.success && paymentResult.requiresRedirect) {
+        console.log('GCash payment result:', paymentResult);
+        
+        if (paymentResult && paymentResult.success && paymentResult.requiresRedirect) {
           Alert.alert(
             'GCash Payment',
             'You will be redirected to GCash to complete your payment.',
@@ -337,6 +352,139 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
               { text: 'Cancel' }
             ]
           );
+        } else {
+          // Handle GCash payment failure
+          const errorMessage = paymentResult?.error || 'GCash payment failed. Please try again.';
+          console.error('GCash payment error:', errorMessage);
+          Alert.alert('Payment Error', errorMessage);
+        }
+      } else if (paymentMethod === 'maya') {
+        const redirectUrls = {
+          success: 'https://payment-redirects-edge-scanner.vercel.app/success',
+          failed: 'https://payment-redirects-edge-scanner.vercel.app/failed',
+        };
+      
+        console.log('Processing Maya payment...');
+        
+        paymentResult = await SubscriptionService.processSubscriptionPayment(
+          user,
+          selectedPlan,
+          'maya',
+          null,
+          redirectUrls
+        );
+        
+        console.log('Maya payment result:', paymentResult);
+        
+        if (paymentResult && paymentResult.success && paymentResult.requiresAction) {
+          // Maya uses Payment Intent workflow, handle differently than GCash
+          Alert.alert(
+            'Maya Payment',
+            'Please complete the Maya payment authentication to proceed.',
+            [
+              {
+                text: 'Complete',
+                onPress: async () => {
+                  try {
+                    // Create Maya payment method and attach to payment intent
+                    const returnUrl = 'https://payment-redirects-edge-scanner.vercel.app/success';
+                    const paymentMethodResult = await PayMongoService.createMayaPaymentMethod(
+                      paymentResult.paymentData.clientSecret,
+                      returnUrl
+                    );
+                    
+                    if (paymentMethodResult.success) {
+                      const status = paymentMethodResult.status;
+                      
+                      if (status === 'awaiting_next_action') {
+                        // Maya requires authentication, redirect user
+                        const nextAction = paymentMethodResult.nextAction;
+                        if (nextAction?.redirect?.url) {
+                          await Linking.openURL(nextAction.redirect.url);
+                          
+                          // Show verification dialog after redirect
+                          Alert.alert(
+                            'Complete Payment',
+                            'After completing payment in Maya, please return to the app to verify your subscription.',
+                            [
+                              {
+                                text: 'Verify Payment',
+                                onPress: async () => {
+                                  try {
+                                    // Verify payment intent status
+                                    const verificationResult = await SubscriptionService.verifyAndCompleteSubscription(
+                                      user,
+                                      { paymentIntentId: paymentResult.paymentData.paymentIntentId },
+                                      selectedPlan
+                                    );
+                                    
+                                    if (verificationResult.success) {
+                                      Alert.alert(
+                                        'Payment Successful!',
+                                        'Your subscription has been activated.',
+                                        [{ 
+                                          text: 'OK', 
+                                          onPress: () => {
+                                            onClose();
+                                            onPaymentComplete?.();
+                                          }
+                                        }]
+                                      );
+                                    } else {
+                                      Alert.alert('Payment Verification', verificationResult.message || 'Please try again or contact support.');
+                                    }
+                                  } catch (error) {
+                                    console.error('Maya verification error:', error);
+                                    Alert.alert('Payment Error', 'Failed to verify Maya payment. Please contact support.');
+                                  }
+                                }
+                              }
+                            ]
+                          );
+                        }
+                      } else if (status === 'succeeded') {
+                        // Payment succeeded immediately
+                        const verificationResult = await SubscriptionService.verifyAndCompleteSubscription(
+                          user,
+                          { paymentIntentId: paymentResult.paymentData.paymentIntentId },
+                          selectedPlan
+                        );
+                        
+                        if (verificationResult.success) {
+                          Alert.alert(
+                            'Payment Successful!',
+                            'Your subscription has been activated.',
+                            [{ 
+                              text: 'OK', 
+                              onPress: () => {
+                                onClose();
+                                onPaymentComplete?.();
+                              }
+                            }]
+                          );
+                        } else {
+                          Alert.alert('Payment Failed', verificationResult.message || 'Please try again.');
+                        }
+                                             } else {
+                         Alert.alert('Payment Error', `Maya payment failed with status: ${status}`);
+                       }
+                     } else {
+                       Alert.alert('Payment Error', paymentMethodResult.error || 'Failed to create Maya payment method.');
+                     }
+                   } catch (error) {
+                     console.error('Maya payment error:', error);
+                     Alert.alert('Payment Error', 'Failed to process Maya payment. Please try again.');
+                  }
+                }
+              },
+              { text: 'Cancel' }
+            ]
+          );
+        } else {
+          // Handle Maya payment failure
+          const errorMessage = paymentResult?.error || 'Maya payment failed. Please try again.';
+          console.error('Maya payment error:', errorMessage);
+          Alert.alert('Payment Error', errorMessage);
         }
       }
     } catch (error) {
@@ -390,6 +538,29 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
           paymentMethod === 'gcash' && styles.radioButtonSelected
         ]}>
           {paymentMethod === 'gcash' && <View style={styles.radioButtonInner} />}
+        </View>
+      </TouchableOpacity>
+      
+      <TouchableOpacity
+        style={[
+          styles.paymentMethodOption,
+          paymentMethod === 'maya' && styles.selectedPaymentMethod
+        ]}
+        onPress={() => setPaymentMethod('maya')}
+      >
+        <View style={styles.paymentMethodInfo}>
+          <Image 
+            source={require('../../assets/maya-logo.png')} 
+            style={styles.mayaLogo}
+            resizeMode="contain"
+          />
+          <Text style={styles.paymentMethodText}>Maya</Text>
+        </View>
+        <View style={[
+          styles.radioButton,
+          paymentMethod === 'maya' && styles.radioButtonSelected
+        ]}>
+          {paymentMethod === 'maya' && <View style={styles.radioButtonInner} />}
         </View>
       </TouchableOpacity>
     </View>
@@ -522,6 +693,17 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
     </View>
   );
 
+  const MayaInfo = () => (
+    <View style={styles.mayaInfoContainer}>
+      <View style={styles.mayaInfoBox}>
+        <Ionicons name="information-circle" size={24} color="#00AADF" />
+        <Text style={styles.mayaInfoText}>
+          You will be redirected to Maya to complete your payment securely.
+        </Text>
+      </View>
+    </View>
+  );
+
   return (
     <Modal
       visible={visible}
@@ -545,7 +727,7 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
           
           <PaymentMethodSelector />
           
-          {paymentMethod === 'card' ? CardForm : <GCashInfo />}
+          {paymentMethod === 'card' ? CardForm : paymentMethod === 'gcash' ? <GCashInfo /> : <MayaInfo />}
           
           <View style={styles.securityInfo}>
             <Ionicons name="shield-checkmark" size={20} color="#10b981" />
@@ -791,6 +973,29 @@ const styles = StyleSheet.create({
   cardTypeLogo: {
     width: 32,
     height: 20,
+  },
+  mayaLogo: {
+    width: 24,
+    height: 24,
+  },
+  mayaInfoContainer: {
+    marginBottom: 24,
+  },
+  mayaInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e6f7ff',
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#00AADF',
+  },
+  mayaInfoText: {
+    fontSize: 14,
+    color: '#374151',
+    marginLeft: 12,
+    flex: 1,
+    lineHeight: 20,
   },
 });
 

@@ -255,6 +255,22 @@ class SubscriptionService {
           },
           requiresRedirect: true
         };
+      } else if (paymentMethod === 'maya') {
+        // Maya uses Payment Intent workflow, not Sources workflow
+        paymentResult = await PayMongoService.processMayaPayment(
+          amount,
+          `${planDetails.name} Subscription`
+        );
+        
+        return {
+          success: true,
+          paymentData: {
+            paymentIntentId: paymentResult.paymentIntent.id,
+            clientSecret: paymentResult.clientSecret,
+            amount: amount
+          },
+          requiresAction: true // Maya requires creating payment method and attaching
+        };
       }
     } catch (error) {
       console.error('Error processing subscription payment:', error);
