@@ -37,7 +37,7 @@ export default function ProfileScreen() {
         try {
           await SubscriptionService.initializeUserSubscription(user);
           const userSubscription = SubscriptionService.getUserSubscription(user);
-          const { remainingScans: remaining } = SubscriptionService.canPerformScan(user);
+          const { remainingScans: remaining } = await SubscriptionService.canPerformScan(user);
           setSubscription(userSubscription);
           setRemainingScans(remaining);
         } catch (error) {
@@ -289,13 +289,30 @@ export default function ProfileScreen() {
                         </Text>
                       )}
                     </Text>
+                    {/* Show expiration status for paid plans */}
+                    {subscription.plan !== SUBSCRIPTION_PLANS.FREE && (() => {
+                      const expirationStatus = SubscriptionService.getSubscriptionExpirationStatus(user);
+                      return (
+                        <Text style={[
+                          styles.expirationText,
+                          expirationStatus.status === 'expired' && styles.expiredText,
+                          expirationStatus.status === 'expiring_soon' && styles.expiringSoonText
+                        ]}>
+                          {expirationStatus.message}
+                        </Text>
+                      );
+                    })()}
                   </View>
-                  {subscription.plan === SUBSCRIPTION_PLANS.FREE && (
+                  {(subscription.plan === SUBSCRIPTION_PLANS.FREE || 
+                    SubscriptionService.getSubscriptionExpirationStatus(user).status === 'expired' ||
+                    SubscriptionService.isSubscriptionExpiringSoon(user)) && (
                     <TouchableOpacity 
                       style={styles.upgradeButton}
                       onPress={handleSubscriptionUpgrade}
                     >
-                      <Text style={styles.upgradeButtonText}>Upgrade</Text>
+                      <Text style={styles.upgradeButtonText}>
+                        {subscription.plan === SUBSCRIPTION_PLANS.FREE ? 'Upgrade' : 'Renew'}
+                      </Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -306,6 +323,9 @@ export default function ProfileScreen() {
                       {remainingScans === -1 ? '∞' : remainingScans}
                     </Text>
                     <Text style={styles.statLabel}>Scans Remaining</Text>
+                    {remainingScans === 0 && subscription.plan === SUBSCRIPTION_PLANS.FREE && (
+                      <Text style={styles.resetLabel}>Scans reset tomorrow</Text>
+                    )}
                   </View>
                   {subscription.plan === SUBSCRIPTION_PLANS.FREE && (
                     <View style={styles.statItem}>
@@ -668,6 +688,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
   },
+  resetLabel: {
+    fontSize: 11,
+    color: '#F59E0B',
+    fontWeight: '500',
+    marginTop: 2,
+    textAlign: 'center',
+  },
   subscriptionFeatures: {
     gap: 8,
   },
@@ -679,5 +706,18 @@ const styles = StyleSheet.create({
   featureText: {
     fontSize: 14,
     color: '#374151',
+  },
+  expirationText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
+  },
+  expiredText: {
+    color: '#EF4444',
+    fontWeight: '600',
+  },
+  expiringSoonText: {
+    color: '#F59E0B',
+    fontWeight: '600',
   },
 });

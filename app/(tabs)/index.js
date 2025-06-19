@@ -58,8 +58,17 @@ export default function App() {
       const checkSubscription = async () => {
         try {
           await SubscriptionService.initializeUserSubscription(user);
-          const { canScan, remainingScans: remaining } = SubscriptionService.canPerformScan(user);
+          const { canScan, remainingScans: remaining, wasExpired } = await SubscriptionService.canPerformScan(user);
           setRemainingScans(remaining);
+          
+          // Show notification if subscription was expired and downgraded
+          if (wasExpired) {
+            Alert.alert(
+              'Subscription Expired',
+              'Your subscription has expired and you have been downgraded to the free plan. Upgrade to continue enjoying unlimited scans.',
+              [{ text: 'OK' }, { text: 'Upgrade Now', onPress: handleSubscriptionUpgrade }]
+            );
+          }
         } catch (error) {
           console.error('Error checking subscription:', error);
         }
@@ -73,11 +82,24 @@ export default function App() {
     
     // Check subscription limits before processing scan
     if (user) {
-      const { canScan } = SubscriptionService.canPerformScan(user);
+      const { canScan, wasExpired } = await SubscriptionService.canPerformScan(user);
       if (!canScan) {
         setScanned(true);
         setIsScanning(false);
-        handleSubscriptionUpgrade();
+        
+        // Show different message if subscription was expired
+        if (wasExpired) {
+          Alert.alert(
+            'Subscription Expired',
+            'Your subscription has expired. Please upgrade to continue scanning.',
+            [
+              { text: 'Cancel' },
+              { text: 'Upgrade Now', onPress: handleSubscriptionUpgrade }
+            ]
+          );
+        } else {
+          handleSubscriptionUpgrade();
+        }
         return;
       }
     }
@@ -92,7 +114,7 @@ export default function App() {
       // Increment scan count
       if (user) {
         await SubscriptionService.incrementScanCount(user);
-        const { remainingScans: remaining } = SubscriptionService.canPerformScan(user);
+        const { remainingScans: remaining } = await SubscriptionService.canPerformScan(user);
         setRemainingScans(remaining);
       }
       
@@ -131,7 +153,7 @@ export default function App() {
     }
   };
 
-  const startScanning = () => {
+  const startScanning = async () => {
     if (!isCameraOn) {
       Alert.alert('Turn On Camera', 'Please turn on the camera first before scanning');
       return;
@@ -139,7 +161,7 @@ export default function App() {
     
     // Check subscription limits before starting scan
     if (user) {
-      const { canScan } = SubscriptionService.canPerformScan(user);
+      const { canScan } = await SubscriptionService.canPerformScan(user);
       if (!canScan) {
         handleSubscriptionUpgrade();
         return;
@@ -160,10 +182,10 @@ export default function App() {
     router.push('/(tabs)/profile');
   };
 
-  const openManualInput = () => {
+  const openManualInput = async () => {
     // Check subscription limits before opening manual input
     if (user) {
-      const { canScan } = SubscriptionService.canPerformScan(user);
+      const { canScan } = await SubscriptionService.canPerformScan(user);
       if (!canScan) {
         handleSubscriptionUpgrade();
         return;
@@ -188,7 +210,7 @@ export default function App() {
 
     // Check subscription limits before processing manual lookup
     if (user) {
-      const { canScan } = SubscriptionService.canPerformScan(user);
+      const { canScan } = await SubscriptionService.canPerformScan(user);
       if (!canScan) {
         closeManualInput();
         handleSubscriptionUpgrade();
@@ -206,7 +228,7 @@ export default function App() {
         // Increment scan count for manual lookup
         if (user) {
           await SubscriptionService.incrementScanCount(user);
-          const { remainingScans: remaining } = SubscriptionService.canPerformScan(user);
+          const { remainingScans: remaining } = await SubscriptionService.canPerformScan(user);
           setRemainingScans(remaining);
         }
         
@@ -364,13 +386,13 @@ export default function App() {
             {user && remainingScans >= 0 && (
               <TouchableOpacity 
                 style={styles.scanCounter}
-                onPress={handleSubscriptionUpgrade}
-                activeOpacity={0.7}
+                onPress={remainingScans === 0 ? handleSubscriptionUpgrade : undefined}
+                activeOpacity={remainingScans === 0 ? 0.7 : 1}
               >
                 <Text style={styles.scanCounterText}>
                   {remainingScans === -1 ? '∞' : remainingScans} scans left
                 </Text>
-                {remainingScans !== -1 && (
+                {remainingScans === 0 && (
                   <Ionicons 
                     name="chevron-forward" 
                     size={14} 
@@ -424,6 +446,11 @@ export default function App() {
                 <Text style={styles.scanText}>
                   {isScanning ? 'Scanning for QR Code...' : 'Click the scan button to start'}
                 </Text>
+                {!isScanning && remainingScans === 0 && (
+                  <Text style={styles.resetMessageText}>
+                    Scans reset tomorrow
+                  </Text>
+                )}
               </View>
               <View style={styles.unfocusedContainer}></View>
             </View>
@@ -445,13 +472,13 @@ export default function App() {
             {user && remainingScans >= 0 && (
               <TouchableOpacity 
                 style={styles.scanCounter}
-                onPress={handleSubscriptionUpgrade}
-                activeOpacity={0.7}
+                onPress={remainingScans === 0 ? handleSubscriptionUpgrade : undefined}
+                activeOpacity={remainingScans === 0 ? 0.7 : 1}
               >
                 <Text style={styles.scanCounterText}>
                   {remainingScans === -1 ? '∞' : remainingScans} scans left
                 </Text>
-                {remainingScans !== -1 && (
+                {remainingScans === 0 && (
                   <Ionicons 
                     name="chevron-forward" 
                     size={14} 
@@ -975,5 +1002,17 @@ const styles = StyleSheet.create({
   },
   scanCounterIcon: {
     marginLeft: 2,
+  },
+  resetMessageText: {
+    color: '#F59E0B',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
 });

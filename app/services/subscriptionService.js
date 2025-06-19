@@ -90,7 +90,7 @@ class SubscriptionService {
   }
 
   // Update user's subscription plan
-  static async updateSubscriptionPlan(user, newPlan) {
+  static async updateSubscriptionPlan(user, newPlan, expirationDate = null) {
     if (!user) {
       console.error('updateSubscriptionPlan: No user provided');
       return false;
@@ -101,6 +101,14 @@ class SubscriptionService {
       const currentMetadata = user.unsafeMetadata || {};
       const currentSubscription = currentMetadata.subscription || {};
 
+      // Calculate expiration date based on plan type
+      let calculatedExpiration = null;
+      if (newPlan === SUBSCRIPTION_PLANS.MONTHLY_PRO) {
+        calculatedExpiration = expirationDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // 30 days from now
+      } else if (newPlan === SUBSCRIPTION_PLANS.YEARLY_PRO) {
+        calculatedExpiration = expirationDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // 365 days from now
+      }
+
       await user.update({
         unsafeMetadata: {
           ...currentMetadata,
@@ -108,6 +116,7 @@ class SubscriptionService {
             ...currentSubscription,
             plan: newPlan,
             updatedAt: new Date().toISOString(),
+            expiresAt: calculatedExpiration, // Add expiration tracking
             dailyScans: {
               count: 0,
               lastResetDate: new Date().toISOString().split('T')[0]
@@ -116,7 +125,7 @@ class SubscriptionService {
         }
       });
       
-      console.log('Subscription plan updated successfully to:', newPlan);
+      console.log('Subscription plan updated successfully to:', newPlan, 'expires at:', calculatedExpiration);
       return true;
     } catch (error) {
       console.error('Error updating subscription plan:', error);
@@ -124,14 +133,59 @@ class SubscriptionService {
     }
   }
 
-  // Check if user can perform a scan
-  static canPerformScan(user) {
+  // Check if subscription has expired and handle accordingly
+  static async checkAndHandleExpiration(user) {
+    if (!user) return false;
+
     const subscription = this.getUserSubscription(user);
+    
+    // Free plans don't expire
+    if (subscription.plan === SUBSCRIPTION_PLANS.FREE) {
+      return { isExpired: false, subscription };
+    }
+
+    // All new paid subscriptions should have expiration dates
+    if (!subscription.expiresAt) {
+      console.error('Paid subscription without expiration date - this should not happen with new subscriptions');
+      return { isExpired: false, subscription };
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const isExpired = today > subscription.expiresAt;
+
+    if (isExpired) {
+      console.log('Subscription expired, downgrading to free plan');
+      // Automatically downgrade to free plan
+      await this.updateSubscriptionPlan(user, SUBSCRIPTION_PLANS.FREE);
+      
+      return { 
+        isExpired: true, 
+        expiredPlan: subscription.plan,
+        subscription: {
+          ...subscription,
+          plan: SUBSCRIPTION_PLANS.FREE,
+          expiresAt: null
+        }
+      };
+    }
+
+    return { isExpired: false, subscription };
+  }
+
+  // Check if user can perform a scan (with expiration check)
+  static async canPerformScan(user) {
+    // First check if subscription has expired
+    const expirationCheck = await this.checkAndHandleExpiration(user);
+    const subscription = expirationCheck.subscription;
     const planLimits = PLAN_LIMITS[subscription.plan];
     
-    // Pro plans have unlimited scans
+    // Pro plans have unlimited scans (if not expired)
     if (planLimits.unlimited) {
-      return { canScan: true, remainingScans: -1 };
+      return { 
+        canScan: true, 
+        remainingScans: -1,
+        wasExpired: expirationCheck.isExpired
+      };
     }
     
     // Check daily limit for free plan
@@ -140,13 +194,18 @@ class SubscriptionService {
     
     // Reset daily count if it's a new day
     if (dailyScans.lastResetDate !== today) {
-      return { canScan: true, remainingScans: planLimits.dailyScans - 1 };
+      return { 
+        canScan: true, 
+        remainingScans: planLimits.dailyScans - 1,
+        wasExpired: expirationCheck.isExpired
+      };
     }
     
     const remainingScans = planLimits.dailyScans - dailyScans.count;
     return { 
       canScan: remainingScans > 0, 
-      remainingScans: Math.max(0, remainingScans)
+      remainingScans: Math.max(0, remainingScans),
+      wasExpired: expirationCheck.isExpired
     };
   }
 
@@ -191,6 +250,52 @@ class SubscriptionService {
     const subscription = this.getUserSubscription(user);
     const planLimits = PLAN_LIMITS[subscription.plan];
     return planLimits.showPhoto;
+  }
+
+  // Get remaining days until subscription expires
+  static getSubscriptionDaysRemaining(user) {
+    const subscription = this.getUserSubscription(user);
+    
+    if (subscription.plan === SUBSCRIPTION_PLANS.FREE || !subscription.expiresAt) {
+      return null; // Free plan or no expiration
+    }
+
+    const today = new Date();
+    const expirationDate = new Date(subscription.expiresAt);
+    const diffTime = expirationDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return Math.max(0, diffDays);
+  }
+
+  // Check if subscription is about to expire (within 7 days)
+  static isSubscriptionExpiringSoon(user) {
+    const daysRemaining = this.getSubscriptionDaysRemaining(user);
+    return daysRemaining !== null && daysRemaining <= 7 && daysRemaining > 0;
+  }
+
+  // Get subscription expiration status
+  static getSubscriptionExpirationStatus(user) {
+    const subscription = this.getUserSubscription(user);
+    const daysRemaining = this.getSubscriptionDaysRemaining(user);
+    
+    if (subscription.plan === SUBSCRIPTION_PLANS.FREE) {
+      return { status: 'free', message: 'Free plan - no expiration' };
+    }
+    
+    if (!subscription.expiresAt) {
+      return { status: 'no_expiration', message: 'No expiration date set' };
+    }
+    
+    if (daysRemaining === 0) {
+      return { status: 'expired', message: 'Subscription has expired' };
+    }
+    
+    if (daysRemaining <= 7) {
+      return { status: 'expiring_soon', message: `Expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}` };
+    }
+    
+    return { status: 'active', message: `Active for ${daysRemaining} more days` };
   }
 
   // Get plan details
