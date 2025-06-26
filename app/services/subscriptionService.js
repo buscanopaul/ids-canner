@@ -330,7 +330,8 @@ class SubscriptionService {
         paymentResult = await PayMongoService.processCardPayment(
           amount,
           paymentDetails,
-          `${planDetails.name} Subscription`
+          `${planDetails.name} Subscription`,
+          user.id
         );
         
         // For card payments, return the result for client-side 3D Secure handling
@@ -347,7 +348,8 @@ class SubscriptionService {
         paymentResult = await PayMongoService.processGCashPayment(
           amount,
           redirectUrls,
-          `${planDetails.name} Subscription`
+          `${planDetails.name} Subscription`,
+          user.id
         );
         
         return {
@@ -364,7 +366,8 @@ class SubscriptionService {
         // Maya uses Payment Intent workflow, not Sources workflow
         paymentResult = await PayMongoService.processMayaPayment(
           amount,
-          `${planDetails.name} Subscription`
+          `${planDetails.name} Subscription`,
+          user.id
         );
         
         return {

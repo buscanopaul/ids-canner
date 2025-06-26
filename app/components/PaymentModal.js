@@ -306,7 +306,8 @@ const PaymentModal = ({ visible, onClose, selectedPlan, planDetails, onPaymentCo
                               // For GCash, we need to create the payment after user authorization
                               const payment = await PayMongoService.completeGCashPayment(
                                 paymentResult.paymentData.source,
-                                `${planDetails?.name} Subscription`
+                                `${planDetails?.name} Subscription`,
+                                user.id
                               );
                               
                               // Now verify with the actual payment

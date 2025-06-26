@@ -77,8 +77,11 @@ class PayMongoService {
   }
 
   // Create payment intent for card payment
-  static async createPaymentIntent(amount, currency = 'PHP', description = 'Payment') {
+  static async createPaymentIntent(amount, currency = 'PHP', description = 'Payment', userId = null) {
     try {
+      // Include user ID in description if provided
+      const fullDescription = userId ? `${description} - User ID: ${userId}` : description;
+      
       const response = await fetch(`${PAYMONGO_BASE_URL}/payment_intents`, {
         method: 'POST',
         headers: {
@@ -97,7 +100,7 @@ class PayMongoService {
                 },
               },
               currency: currency,
-              description: description,
+              description: fullDescription,
               capture_type: 'automatic',
             },
           },
@@ -164,7 +167,7 @@ class PayMongoService {
   }
 
   // Process card payment with 3D Secure support
-  static async processCardPayment(amount, cardDetails, description) {
+  static async processCardPayment(amount, cardDetails, description, userId = null) {
     try {
       // Step 1: Create payment method
       const paymentMethodResult = await this.createPaymentMethod(cardDetails);
@@ -173,7 +176,7 @@ class PayMongoService {
       }
 
       // Step 2: Create payment intent
-      const paymentIntentResult = await this.createPaymentIntent(amount, 'PHP', description);
+      const paymentIntentResult = await this.createPaymentIntent(amount, 'PHP', description, userId);
       if (!paymentIntentResult.success) {
         throw new Error(paymentIntentResult.error);
       }
@@ -217,8 +220,11 @@ class PayMongoService {
   }
 
   // Create GCash source for payment
-  static async processGCashPayment(amount, redirectUrls, description) {
+  static async processGCashPayment(amount, redirectUrls, description, userId = null) {
     try {
+      // Include user ID in description if provided
+      const fullDescription = userId ? `${description} - User ID: ${userId}` : description;
+      
       const response = await fetch(`${PAYMONGO_BASE_URL}/sources`, {
         method: 'POST',
         headers: {
@@ -232,7 +238,7 @@ class PayMongoService {
               type: 'gcash',
               amount: Math.round(amount * 100), // Convert to centavos
               currency: 'PHP',
-              description: description,
+              description: fullDescription,
               redirect: {
                 success: redirectUrls.success,
                 failed: redirectUrls.failed,
@@ -263,8 +269,11 @@ class PayMongoService {
   }
 
   // Complete GCash payment after user authorization
-  static async completeGCashPayment(source, description) {
+  static async completeGCashPayment(source, description, userId = null) {
     try {
+      // Include user ID in description if provided
+      const fullDescription = userId ? `${description} - User ID: ${userId}` : description;
+      
       const response = await fetch(`${PAYMONGO_BASE_URL}/payments`, {
         method: 'POST',
         headers: {
@@ -277,7 +286,7 @@ class PayMongoService {
             attributes: {
               amount: source.attributes.amount,
               currency: 'PHP',
-              description: description,
+              description: fullDescription,
               source: {
                 id: source.id,
                 type: 'source',
@@ -301,8 +310,11 @@ class PayMongoService {
   }
 
   // Create Maya Payment Intent - Maya uses Payment Intent workflow
-  static async processMayaPayment(amount, description) {
+  static async processMayaPayment(amount, description, userId = null) {
     try {
+      // Include user ID in description if provided
+      const fullDescription = userId ? `${description} - User ID: ${userId}` : description;
+      
       const response = await fetch(`${PAYMONGO_BASE_URL}/payment_intents`, {
         method: 'POST',
         headers: {
@@ -316,7 +328,7 @@ class PayMongoService {
               amount: Math.round(amount * 100), // Convert to centavos
               payment_method_allowed: ['paymaya'], // Maya payment method (API still uses 'paymaya')
               currency: 'PHP',
-              description: description,
+              description: fullDescription,
               capture_type: 'automatic',
             },
           },
@@ -615,6 +627,60 @@ class PayMongoService {
   static isValidEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
+  }
+
+  // Fetch payment history for a specific user
+  static async getPaymentHistory(userId, limit = 50) {
+    try {
+      // Fetch completed payments (GCash, Card, and Maya payments that were completed)
+      // Note: PayMongo doesn't support listing payment_intents via GET for security reasons
+      const paymentsResponse = await fetch(`${PAYMONGO_BASE_URL}/payments`, {
+        method: 'GET',
+        headers: {
+          'Authorization': this.getAuthHeader(),
+        },
+      });
+      
+      if (!paymentsResponse.ok) {
+        const errorText = await paymentsResponse.text();
+        throw new Error(`Failed to fetch payments: ${paymentsResponse.status} ${errorText}`);
+      }
+
+      const paymentsData = await paymentsResponse.json();
+
+      // Filter payments that contain the user ID in the description
+      const userPayments = paymentsData.data?.filter(payment => 
+        payment.attributes.description?.includes(`User ID: ${userId}`)
+      ) || [];
+
+      // Format payment history
+      const paymentHistory = userPayments.map(payment => ({
+        id: payment.id,
+        type: 'payment',
+        amount: payment.attributes.amount / 100, // Convert from centavos
+        currency: payment.attributes.currency,
+        status: payment.attributes.status,
+        description: payment.attributes.description,
+        created_at: payment.attributes.created_at,
+        // Determine payment method from the payment source
+        payment_method: payment.attributes.source?.type || 'card',
+      }));
+
+      // Sort by creation date (newest first)
+      paymentHistory.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+      return {
+        success: true,
+        payments: paymentHistory,
+      };
+    } catch (error) {
+      console.error('PayMongo getPaymentHistory error:', error);
+      return {
+        success: false,
+        error: error.message,
+        payments: [],
+      };
+    }
   }
 
   // Test API connection

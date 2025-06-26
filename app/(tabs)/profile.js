@@ -9,12 +9,14 @@ import {
   Animated,
   Dimensions,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { useUser, useAuth } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import SubscriptionService, { SUBSCRIPTION_PLANS } from '../services/subscriptionService';
+import PayMongoService from '../services/paymongoService';
 
 const { width } = Dimensions.get('window');
 
@@ -24,27 +26,41 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [subscription, setSubscription] = useState(null);
   const [remainingScans, setRemainingScans] = useState(0);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(width)).current; // Start off-screen to the right
   const fadeAnim = useRef(new Animated.Value(0)).current; // Start invisible
   const scaleAnim = useRef(new Animated.Value(0.9)).current; // Start slightly smaller
 
-  // Load subscription data
+  // Load subscription data and payment history
   useEffect(() => {
     if (user) {
-      const loadSubscriptionData = async () => {
+      const loadData = async () => {
         try {
+          // Load subscription data
           await SubscriptionService.initializeUserSubscription(user);
           const userSubscription = SubscriptionService.getUserSubscription(user);
           const { remainingScans: remaining } = await SubscriptionService.canPerformScan(user);
           setSubscription(userSubscription);
           setRemainingScans(remaining);
+
+          // Load payment history
+          setLoadingPayments(true);
+          const paymentHistoryResult = await PayMongoService.getPaymentHistory(user.id);
+          if (paymentHistoryResult.success) {
+            setPaymentHistory(paymentHistoryResult.payments);
+          } else {
+            console.error('Failed to load payment history:', paymentHistoryResult.error);
+          }
         } catch (error) {
-          console.error('Error loading subscription data:', error);
+          console.error('Error loading data:', error);
+        } finally {
+          setLoadingPayments(false);
         }
       };
-      loadSubscriptionData();
+      loadData();
     }
   }, [user]);
 
@@ -346,6 +362,123 @@ export default function ProfileScreen() {
               </View>
             </View>
           )}
+
+          {/* Payment History */}
+          <View style={styles.card}>
+            <View style={styles.cardHeaderWithAction}>
+              <Text style={styles.cardTitle}>Payment History</Text>
+              {loadingPayments && (
+                <ActivityIndicator size="small" color="#3B82F6" />
+              )}
+            </View>
+
+            {paymentHistory.length > 0 ? (
+              <ScrollView style={styles.paymentHistoryContainer} nestedScrollEnabled={true}>
+                {paymentHistory.slice(0, 5).map((payment, index) => (
+                  <View key={payment.id} style={styles.paymentItem}>
+                    <View style={styles.paymentLeft}>
+                      <View style={styles.paymentMethodIcon}>
+                        {payment.payment_method === 'gcash' && (
+                          <Text style={styles.paymentMethodText}>G</Text>
+                        )}
+                        {payment.payment_method === 'paymaya' && (
+                          <Text style={styles.paymentMethodText}>M</Text>
+                        )}
+                        {(payment.payment_method === 'card' || !payment.payment_method || payment.payment_method === 'visa' || payment.payment_method === 'mastercard') && (
+                          <Ionicons name="card" size={16} color="#3B82F6" />
+                        )}
+                      </View>
+                      <View style={styles.paymentDetails}>
+                        <Text style={styles.paymentDescription}>
+                          {payment.description?.replace(` - User ID: ${user?.id}`, '') || 'Subscription Payment'}
+                        </Text>
+                        <Text style={styles.paymentDate}>
+                          {(() => {
+                            let date;
+                            
+                            // Handle different date formats from PayMongo
+                            if (typeof payment.created_at === 'number') {
+                              // Unix timestamp in seconds
+                              date = new Date(payment.created_at * 1000);
+                            } else if (typeof payment.created_at === 'string') {
+                              // Check if it's a Unix timestamp as string
+                              const timestamp = parseInt(payment.created_at);
+                              if (!isNaN(timestamp) && timestamp > 1000000000 && timestamp < 10000000000) {
+                                // Unix timestamp in seconds (10 digits)
+                                date = new Date(timestamp * 1000);
+                              } else if (!isNaN(timestamp) && timestamp > 1000000000000) {
+                                // Unix timestamp in milliseconds (13 digits)
+                                date = new Date(timestamp);
+                              } else {
+                                // ISO string or other date format
+                                date = new Date(payment.created_at);
+                              }
+                            } else {
+                              date = new Date(payment.created_at);
+                            }
+                            
+                            if (isNaN(date.getTime())) {
+                              return 'Invalid date';
+                            }
+                            
+                            return date.toLocaleString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true,
+                            });
+                          })()}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.paymentRight}>
+                      <Text style={styles.paymentAmount}>
+                        ₱{payment.amount.toLocaleString()}
+                      </Text>
+                      <View style={[
+                        styles.paymentStatus,
+                        payment.status === 'succeeded' || payment.status === 'paid' 
+                          ? styles.paymentStatusSuccess 
+                          : payment.status === 'pending' 
+                          ? styles.paymentStatusPending 
+                          : styles.paymentStatusFailed
+                      ]}>
+                        <Text style={[
+                          styles.paymentStatusText,
+                          payment.status === 'succeeded' || payment.status === 'paid' 
+                            ? styles.paymentStatusSuccessText 
+                            : payment.status === 'pending' 
+                            ? styles.paymentStatusPendingText 
+                            : styles.paymentStatusFailedText
+                        ]}>
+                          {payment.status === 'succeeded' || payment.status === 'paid' ? 'Success' : 
+                           payment.status === 'pending' ? 'Pending' : 
+                           payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+                
+                {paymentHistory.length > 5 && (
+                  <TouchableOpacity style={styles.viewAllPayments}>
+                    <Text style={styles.viewAllPaymentsText}>View All Payments</Text>
+                    <Ionicons name="arrow-forward" size={16} color="#3B82F6" />
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+            ) : (
+              <View style={styles.noPaymentHistory}>
+                <Ionicons name="receipt-outline" size={48} color="#9CA3AF" />
+                <Text style={styles.noPaymentHistoryTitle}>No Payment History</Text>
+                <Text style={styles.noPaymentHistoryText}>
+                  Your payment transactions will appear here once you make a purchase.
+                </Text>
+              </View>
+            )}
+          </View>
 
           {/* Account Details */}
           <View style={styles.card}>
@@ -722,5 +855,123 @@ const styles = StyleSheet.create({
   expiringSoonText: {
     color: '#F59E0B',
     fontWeight: '600',
+  },
+  // Payment History Styles
+  cardHeaderWithAction: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  paymentHistoryContainer: {
+    maxHeight: 300,
+  },
+  paymentItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  paymentLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  paymentMethodIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  paymentMethodText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#3B82F6',
+  },
+  paymentDetails: {
+    flex: 1,
+  },
+  paymentDescription: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  paymentDate: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  paymentRight: {
+    alignItems: 'flex-end',
+  },
+  paymentAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  paymentStatus: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  paymentStatusSuccess: {
+    backgroundColor: '#D1FAE5',
+  },
+  paymentStatusPending: {
+    backgroundColor: '#FEF3C7',
+  },
+  paymentStatusFailed: {
+    backgroundColor: '#FEE2E2',
+  },
+  paymentStatusText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  paymentStatusSuccessText: {
+    color: '#065F46',
+  },
+  paymentStatusPendingText: {
+    color: '#92400E',
+  },
+  paymentStatusFailedText: {
+    color: '#991B1B',
+  },
+  viewAllPayments: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 8,
+  },
+  viewAllPaymentsText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#3B82F6',
+  },
+  noPaymentHistory: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+  },
+  noPaymentHistoryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  noPaymentHistoryText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });
