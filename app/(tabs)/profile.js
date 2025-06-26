@@ -391,10 +391,13 @@ export default function ProfileScreen() {
                 <Text style={styles.detailLabel}>Last Sign In</Text>
                 <Text style={styles.detailValue}>
                   {user?.lastSignInAt
-                    ? new Date(user.lastSignInAt).toLocaleDateString('en-US', {
+                    ? new Date(user.lastSignInAt).toLocaleString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
                       })
                     : 'Unknown'}
                 </Text>
